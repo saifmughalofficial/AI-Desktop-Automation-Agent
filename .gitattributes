@@ -1,2 +1,10 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.zip binary
+*.docx binary
+*.sqlite3 binary
+*.bat text eol=crlf
