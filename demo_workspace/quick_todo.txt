@@ -1,0 +1,2 @@
+- Try: Organize my files by type, but show me the proposed changes first
+- Try: Zip the Projects folder

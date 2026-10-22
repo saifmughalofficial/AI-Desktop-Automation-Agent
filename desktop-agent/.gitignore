@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+build/
+dist/
+*.spec
+demo_workspace/.agent_trash/
+.pytest_cache/

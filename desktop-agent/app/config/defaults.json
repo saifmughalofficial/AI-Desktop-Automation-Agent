@@ -1,0 +1,48 @@
+{
+  "approved_roots": [
+    {"alias": "Demo", "path": "${DEMO_WORKSPACE}", "access": "read_write"}
+  ],
+  "apps": [
+    {"name": "Notepad", "aliases": ["notepad", "text editor", "notepad.exe"], "command": "notepad.exe",
+     "window_title": ".* - Notepad$", "platforms": ["win32"], "automatable": true},
+    {"name": "Calculator", "aliases": ["calculator", "calc", "calc.exe"], "command": "calc.exe",
+     "window_title": "^Calculator$", "platforms": ["win32"], "automatable": false},
+    {"name": "Paint", "aliases": ["paint", "mspaint", "ms paint", "mspaint.exe"], "command": "mspaint.exe",
+     "window_title": ".* - Paint$", "platforms": ["win32"], "automatable": false},
+    {"name": "Character Map", "aliases": ["character map", "charmap"], "command": "charmap.exe",
+     "window_title": "^Character Map$", "platforms": ["win32"], "automatable": false},
+    {"name": "WordPad", "aliases": ["wordpad", "write.exe"], "command": "write.exe",
+     "window_title": ".* - WordPad$", "platforms": ["win32"], "automatable": false}
+  ],
+  "workflows": [
+    {"name": "Daily Notes", "description": "Open a fresh Notepad window and type a dated header.",
+     "commands": ["type 'Daily notes - agenda, blockers, wins' in notepad"]},
+    {"name": "Tidy Downloads (preview)", "description": "Preview organizing Downloads by file type without moving anything.",
+     "commands": ["organize the files in Downloads by type, but show me the proposed changes first"]},
+    {"name": "Workspace Report", "description": "List the demo folders and look for duplicate files.",
+     "commands": ["list the files in Demo", "find duplicates in Demo"]}
+  ],
+  "llm": {
+    "mode": "auto",
+    "ollama_url": "http://127.0.0.1:11434",
+    "ollama_model": "llama3.2:3b",
+    "llamacpp_url": "http://127.0.0.1:8080",
+    "timeout_s": 45
+  },
+  "policy": {
+    "require_approval_medium": true,
+    "jit_confirm_high": true,
+    "conflict_policy": "ask",
+    "max_actions_per_run": 100,
+    "max_bulk_delete": 20,
+    "stop_on_failure": true
+  },
+  "execution": {
+    "step_delay_s": 0.35,
+    "verify_launch_timeout_s": 6
+  },
+  "history_enabled": true,
+  "animations": true,
+  "theme": "dual",
+  "background_fx": true
+}
