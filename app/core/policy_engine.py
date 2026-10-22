@@ -15,6 +15,7 @@ from app.config.settings import Settings
 from app.core import action_schema as A
 from app.core.action_schema import Plan, Risk, max_risk
 from app.core.permissions import PathViolation, Permissions
+from app.actions.virtual_desktop import WEB_APPS
 from app.runtime import IS_WINDOWS
 
 BASE_RISK: dict[str, Risk] = {
@@ -141,7 +142,10 @@ class PolicyEngine:
             chk.violation = str(exc)
         return chk
 
-    def _need_desktop(self, chk: StepCheck) -> bool:
+    def _need_desktop(self, chk: StepCheck, web_ok: bool = True) -> bool:
+        if not self.desktop_available and self.hosted and web_ok:
+            chk.note = "Runs in the web virtual desktop (cloud sandbox) — the real app opens when run locally on Windows."
+            return True
         if not self.desktop_available:
             chk.violation = ("Desktop application control is only available when the agent runs locally on "
                              "Windows (this is a hosted/sandbox session).")
@@ -262,7 +266,7 @@ class PolicyEngine:
         if automation and not app.automatable:
             chk.violation = f"{app.name} is allowlisted for launching only; UI automation is not enabled for it."
             return
-        self._need_desktop(chk)
+        self._need_desktop(chk, web_ok=app.name.lower() in WEB_APPS)
 
     def _check_launch_app(self, a: A.LaunchApp, sim, chk):
         self._app_check(a.app, chk)

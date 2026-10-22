@@ -88,12 +88,14 @@ class RunState:
 
 
 class Orchestrator:
-    def __init__(self, settings: Settings, perms: Permissions, policy: PolicyEngine, db: Database | None):
+    def __init__(self, settings: Settings, perms: Permissions, policy: PolicyEngine, db: Database | None,
+                 virtual=None):
         self.settings = settings
         self.perms = perms
         self.policy = policy
         self.db = db
         self.launched: dict = {}  # app windows opened by this agent in this session
+        self.virtual = virtual  # web virtual desktop (hosted mode) or None
 
     def update(self, settings: Settings, perms: Permissions, policy: PolicyEngine) -> None:
         self.settings, self.perms, self.policy = settings, perms, policy
@@ -231,7 +233,7 @@ class Orchestrator:
             return ActionResult(StepStatus.FAILED, f"Refused by policy at run time: {chk.violation}")
         ctx = ExecContext(perms=self.perms, settings=self.settings, dry_run=state.dry_run,
                           conflict_mode=state.conflict_override.get(i, self.settings.policy.conflict_policy),
-                          cancel=state.cancel, launched=self.launched)
+                          cancel=state.cancel, launched=self.launched, virtual=self.virtual)
         try:
             return registry.execute(step.action, ctx)
         except ConflictError as exc:

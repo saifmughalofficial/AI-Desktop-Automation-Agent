@@ -74,8 +74,8 @@ def test_screen_allows_normal_requests(policy, text):
 def test_violations(policy):
     p = policy.evaluate(plan_of(A.LaunchApp(app="powershell")))
     assert not p.executable and "allowlist" in p.steps[0].violation
-    p = policy.evaluate(plan_of(A.LaunchApp(app="Notepad")))  # hosted session: no desktop control
-    assert "Windows" in p.steps[0].violation
+    p = policy.evaluate(plan_of(A.LaunchApp(app="Notepad")))  # hosted session: web virtual desktop
+    assert p.executable and "virtual desktop" in p.steps[0].note
     p = policy.evaluate(plan_of(A.ListFiles(target=D("Nope"))))
     assert "does not exist" in p.steps[0].violation
 

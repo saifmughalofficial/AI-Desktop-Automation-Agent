@@ -129,7 +129,7 @@ def render() -> None:
                 _go("delete the selected files")
             if st.button("Organize this folder (preview)", icon=":material/auto_fix_high:", width="stretch"):
                 _go(f"organize the files in {cur.display().rstrip('/')} by type, but show me the proposed changes first")
-            if not s.hosted and st.button("Open in File Explorer", icon=":material/open_in_new:", width="stretch"):
+            if st.button("Open in File Explorer", icon=":material/open_in_new:", width="stretch"):
                 _go(f"open {cur.display().rstrip('/')} folder", "run")
 
         if len(picked) == 1:

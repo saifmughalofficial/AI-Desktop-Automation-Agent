@@ -21,10 +21,10 @@ def render() -> None:
                              "app"), unsafe_allow_html=True)
     ok, msg = ui_automation.available()
     if s.hosted:
-        st.markdown(C.callout("warn", "<b>Hosted sandbox session.</b> This web deployment cannot control anyone's "
-                                      "desktop, so launching and UI automation are disabled here. Run the agent locally "
-                                      "on Windows (run.bat) to use them. File automation works in the sandbox."),
-                    unsafe_allow_html=True)
+        st.markdown(C.callout("info", "<b>Cloud sandbox:</b> a website cannot control your PC, so apps open as working "
+                                      "<b>web windows</b> in the Command Center's virtual desktop (Notepad, Calculator, "
+                                      "Paint, Character Map). Run the agent locally on Windows (run.bat) to control the "
+                                      "real apps."), unsafe_allow_html=True)
     else:
         st.markdown(C.callout("ok" if ok else "warn", f"<b>UI automation:</b> {msg}"), unsafe_allow_html=True)
 
@@ -33,13 +33,13 @@ def render() -> None:
         cols = st.columns(3)
         for i, app in enumerate(s.settings.apps):
             exe = app_launcher.resolve_command(app) if not s.hosted else None
-            status = "installed" if exe else ("unavailable here" if s.hosted else "not found")
+            status = "web app" if s.hosted else ("installed" if exe else "not found")
             with cols[i % 3]:
                 st.markdown(f"<div class='appcard'>{C.icon('app', 'big')}<div class='nm'>{app.name}</div>"
                             f"<div class='cmd'>{app.command} · {status}"
                             f"{' · automatable' if app.automatable else ''}</div></div>", unsafe_allow_html=True)
                 if st.button(f"Launch {app.name}", key=f"launch_{app.name}", width="stretch",
-                             icon=":material/rocket_launch:", disabled=s.hosted or not exe):
+                             icon=":material/rocket_launch:", disabled=not (s.hosted or exe)):
                     _go(f"open {app.name}", "run")
         st.caption("Only these programs can be launched. Shells, script hosts and system tools are blocked. "
                    "Manage the list in Settings → Applications.")
@@ -50,8 +50,11 @@ def render() -> None:
         names = [a.name for a in s.settings.apps]
         c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
         target = c1.selectbox("Application window", names)
-        if c2.button("Inspect", type="primary", width="stretch", disabled=s.hosted or not ok):
+        if c2.button("Inspect", type="primary", width="stretch", disabled=not (s.hosted or ok)):
             app = s.perms.find_app(target)
+            if s.hosted:
+                st.session_state.pop("inspect_rows", None)
+                _go(f"inspect the {app.name} window", "run")
             handle = (s.orchestrator.launched.get(app.name.lower()) or {}).get("handle")
             try:
                 rows = ui_automation.inspect_window(app.window_title, handle)

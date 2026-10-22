@@ -204,6 +204,10 @@ background:rgba(8,30,64,.5);border:1px solid rgba(56,189,248,.12);transition:all
 .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:7px;vertical-align:1px}
 .mini-h{font-family:'Orbitron';font-size:.6rem;letter-spacing:.16em;color:var(--muted);margin:8px 0 4px;text-transform:uppercase}
 .mini{font-size:.82rem;color:#cfe3f7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini em{color:var(--muted);font-style:normal}
+.vd-title{font-family:'Orbitron';font-size:.74rem;letter-spacing:.1em;color:#e6f6ff;display:flex;align-items:center;gap:9px}
+.vd-dots{display:inline-flex;gap:4px}.vd-dots i{width:9px;height:9px;border-radius:50%;background:#ff2d55;box-shadow:0 0 6px #ff2d55}
+.vd-dots i:nth-child(2){background:#fbbf24;box-shadow:0 0 6px #fbbf24}.vd-dots i:nth-child(3){background:#34d399;box-shadow:0 0 6px #34d399}
+[data-testid="stVerticalBlockBorderWrapper"]{background:rgba(6,14,36,.72);border-color:rgba(168,85,247,.35)!important;backdrop-filter:blur(6px);animation:hudIn .45s ease both}
 .manual h2{margin-top:1.4rem!important}
 .manual table{width:100%;border-collapse:collapse;font-size:.9rem}.manual td,.manual th{border:1px solid rgba(56,189,248,.18);padding:6px 9px}
 .manual th{background:rgba(14,116,144,.25);font-family:'Rajdhani';letter-spacing:.06em}

@@ -15,6 +15,7 @@ from app.ui import components as C
 from app.ui import state
 from app.ui.approval_dialog import approval_dialog, start_run
 from app.ui.theme import brain_html, esc, header_html
+from app.ui.virtual_apps import render_virtual_desktop
 
 RUNNING = {"running", "queued"}
 UNDO_RE = re.compile(r"^\s*(?:please\s+)?(?:undo|revert|roll ?back)(?:\s+(?:the|my))?(?:\s+(?:last|previous|latest))?"
@@ -372,9 +373,9 @@ def hud_center() -> None:
                     "Running" if running else ("Paused" if run and run.status == "paused" else "Idle"),
                     "amber" if run and not run.done else "", "exec",
                     (run.progress * 100) if run else 0, running=running),
-        C.agent_row("UI automation", (uia_msg if not s.hosted else "Hosted session — desktop control off")[:48],
-                    "Ready" if uia_ok and not s.hosted else "Off", "" if uia_ok and not s.hosted else "off", "eye",
-                    100 if uia_ok and not s.hosted else 8),
+        C.agent_row("UI automation", (uia_msg if not s.hosted else "Web virtual desktop (cloud sandbox)")[:48],
+                    "Ready" if uia_ok or s.hosted else "Off", "" if uia_ok or s.hosted else "off", "eye",
+                    100 if uia_ok or s.hosted else 8),
         C.agent_row("Audit log", f"{stats['tasks']} tasks · {stats['actions']} actions",
                     "Recording" if s.db.enabled else "Disabled", "" if s.db.enabled else "off", "log", 100),
     ]
@@ -497,6 +498,7 @@ def render() -> None:
         else:
             plan_panel(plan)
 
+    render_virtual_desktop()
     refresh = 2.5 if s.settings.animations else 6
     left, center, right = st.columns([1, 1.38, 1])
     with left:

@@ -14,6 +14,7 @@ from app.core.permissions import Permissions
 from app.core.planner import Planner
 from app.core.policy_engine import PolicyEngine
 from app.core.system_monitor import SystemMonitor
+from app.actions.virtual_desktop import VirtualDesktop
 from app.demo_seed import copy_demo_to, seed_demo_workspace
 from app.llm.local_model import LocalModelClient
 from app.runtime import DEMO_WORKSPACE, hosted_mode, local_data_dir
@@ -79,6 +80,6 @@ def build_services(*, hosted: bool | None = None, data_dir: Path | None = None,
         db.mark_interrupted()
     svc = Services(hosted=hosted, workspace=workspace, data_dir=data_dir, store=store, settings=settings,
                    perms=perms, policy=policy, llm=llm, planner=Planner(settings, perms, policy, llm),
-                   orchestrator=Orchestrator(settings, perms, policy, db), db=db)
+                   orchestrator=Orchestrator(settings, perms, policy, db, VirtualDesktop() if hosted else None), db=db)
     log_event("services_started", hosted=hosted)
     return svc

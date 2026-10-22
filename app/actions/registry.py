@@ -32,7 +32,8 @@ class ExecContext:
     dry_run: bool = False
     conflict_mode: str = "ask"  # ask | skip | rename
     cancel: threading.Event | None = None
-    launched: dict = field(default_factory=dict)  # app name (lower) -> {"pid", "handle"}
+    launched: dict = field(default_factory=dict)  # app name (lower) -> {"pid", "handle"} or {"virtual": id}
+    virtual: object | None = None  # VirtualDesktop in hosted mode
 
 
 @dataclass
@@ -240,6 +241,12 @@ def _launch_app(a: A.LaunchApp, ctx: ExecContext) -> ActionResult:
     app = _app_or_fail(ctx, a.app)
     if ctx.dry_run:
         return _sim(f"Would launch {app.name}.")
+    if ctx.virtual is not None:
+        win = ctx.virtual.open_app(app.name)
+        ctx.launched[app.name.lower()] = {"virtual": win["id"]}
+        ok = ctx.virtual.get(win["id"]) is not None
+        return _ok(f"{app.name} opened in the web virtual desktop (window '{win['title']}' verified).", verified=ok,
+                   details={"virtual": win["id"]})
     res = app_launcher.launch(app, timeout=ctx.settings.execution.verify_launch_timeout_s)
     if not res.ok:
         return _fail(res.message)
@@ -253,6 +260,9 @@ def _open_file(a: A.OpenFile, ctx: ExecContext) -> ActionResult:
         return _fail(f"{a.target.display()} is not a file.")
     if ctx.dry_run:
         return _sim(f"Would open {a.target.display()} with its default application.")
+    if ctx.virtual is not None:
+        win = ctx.virtual.open_file(a.target.display(), path)
+        return _ok(f"Opened {a.target.display()} in the web virtual desktop ({win['title']}).")
     res = app_launcher.open_with_default_app(path)
     return _ok(res.message, verified=res.verified) if res.ok else _fail(res.message)
 
@@ -263,12 +273,23 @@ def _open_folder(a: A.OpenFolder, ctx: ExecContext) -> ActionResult:
         return _fail(f"{a.target.display()} is not a folder.")
     if ctx.dry_run:
         return _sim(f"Would open {a.target.display()} in File Explorer.")
+    if ctx.virtual is not None:
+        rows, _ = fs.list_entries(path)
+        ctx.virtual.open_folder(a.target.display(), rows)
+        return _ok(f"Opened {a.target.display()} in the web File Explorer ({len(rows)} item(s)).")
     res = app_launcher.open_folder(path)
     return _ok(res.message, verified=res.verified) if res.ok else _fail(res.message)
 
 
 def _inspect_ui(a: A.InspectUI, ctx: ExecContext) -> ActionResult:
     app = _app_or_fail(ctx, a.app)
+    if ctx.virtual is not None:
+        vid = (ctx.launched.get(app.name.lower()) or {}).get("virtual")
+        win = ctx.virtual.get(vid) or ctx.virtual.latest(app.name.lower())
+        if not win:
+            return _fail(f"No {app.name} window is open in the web virtual desktop. Open it first.")
+        rows = ctx.virtual.controls(win["id"])
+        return _ok(f"Read {len(rows)} control(s) from the {app.name} web window (read-only).", details={"rows": rows})
     ok, why = ui_automation.available()
     if not ok:
         return _fail(why)
@@ -283,6 +304,15 @@ def _inspect_ui(a: A.InspectUI, ctx: ExecContext) -> ActionResult:
 
 def _type_text(a: A.TypeText, ctx: ExecContext) -> ActionResult:
     app = _app_or_fail(ctx, a.app)
+    if ctx.virtual is not None:
+        vid = (ctx.launched.get(app.name.lower()) or {}).get("virtual")
+        if not ctx.virtual.get(vid):
+            return _fail(f"For safety the agent only types into a {app.name} window it opened itself in this session, "
+                         f"and none is open. Add 'open {app.name}' before this step.")
+        if ctx.dry_run:
+            return _sim(f"Would type {len(a.text)} characters into {app.name}.")
+        verified, msg = ctx.virtual.type_text(vid, a.text)
+        return _ok(f"{app.name} (web): {msg}", verified=verified)
     ok, why = ui_automation.available()
     if not ok:
         return _fail(why)
