@@ -1,6 +1,6 @@
 # AI Desktop Automation Agent — User & Instruction Manual
 
-Version 1.1.0. The PDF version is `docs/User_Manual.pdf`.
+Version 1.2.0. The PDF version is `docs/User_Manual.pdf`.
 
 ## 1. What the agent does
 
@@ -180,3 +180,23 @@ The policy engine, not the language model, decides risk and approval. A model's 
 - Opening a file with its default app cannot be verified (Windows does not report it).
 - STOP takes effect between actions, not in the middle of an OS operation.
 - PyInstaller packaging of Streamlit apps is possible (build_exe.bat) but larger and slower to start than run.bat; run.bat is the recommended launcher.
+
+## 18. System Manager
+
+System Manager (sidebar → System) shows live health for the whole PC: CPU, memory, disk and battery gauges, a health score, per-core load and live charts. Tabs: Processes (search, sort, end or force-end a selected process), Storage (all drives and temp-folder size), Network (interfaces, IPs, traffic, connection states), Services & startup (read-only lists), Controls (volume, mute, media keys, 17 Windows Settings shortcuts, lock, restart, shut down, cancel shutdown) and System info.
+
+- Every control is checked by the system policy, not by the UI or by speech. Protected Windows processes (csrss, lsass, winlogon, svchost, explorer…), other accounts' processes and the agent itself can never be ended.
+- Ending a process is MEDIUM risk and needs a confirmation click; restart/shut down are HIGH risk, need an extra tick-box and run with a 60-second Windows warning that you can cancel.
+- Commands are fixed argument lists with no shell; every action is written to History.
+- On the hosted website the page shows the cloud container's stats in read-only mode; controls unlock when you run the agent locally on Windows (run.bat).
+
+## 19. Voice Assistant (multilingual)
+
+Voice Assistant (sidebar → Voice) lets you speak or type commands. Pick the assistant language first: English, Urdu, Hindi, Arabic, Persian, Turkish, French, Spanish, German, Italian, Portuguese, Russian, Chinese, Japanese, Korean, Dutch, Ukrainian, Vietnamese, Gujarati or Telugu (21 options).
+
+- Press the microphone, speak, and stop recording. Speech is recognised offline by Vosk on this machine; each language's free model (30–320 MB) is downloaded once with the Download button.
+- Replies are spoken offline: Windows voices for English, and the bundled espeak-ng voices for every other language (Urdu, Hindi, Arabic and more). Turn speech off or change the rate in Voice settings.
+- Urdu: speech uses the Hindustani model and is shown in Urdu script. You can also type Urdu or Roman Urdu, e.g. “awaz barhao”, “battery kitni hai”, “system ki halat”.
+- Examples: system status · CPU usage · top processes · battery · disk space · volume up · mute · open display settings · close Notepad process · lock the screen · go to history · what time is it.
+- Anything else (e.g. “open Notepad”, “organize my Downloads by type”) is sent to the agent, which shows the plan in the Command Center for your normal review and approval.
+- Voice never executes anything directly: risky actions open a confirmation dialog, and speech text is only matched against keyword tables.

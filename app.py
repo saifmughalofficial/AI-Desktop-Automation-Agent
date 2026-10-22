@@ -8,7 +8,8 @@ from __future__ import annotations
 import streamlit as st
 
 from app import __version__
-from app.ui import automation_page, explorer_page, history_page, main_window, manual_page, settings_dialog, state
+from app.ui import (automation_page, explorer_page, history_page, main_window, manual_page, settings_dialog, state,
+                    system_page, voice_page)
 from app.ui.components import icon
 from app.ui.theme import CSS, FX_CSS, PALETTES, STATIC_CSS, fx_script
 
@@ -51,12 +52,16 @@ pages = {
     "command": st.Page(main_window.render, title="Command Center", icon=":material/dashboard:", default=True),
     "files": st.Page(explorer_page.render, title="File Explorer", icon=":material/folder_open:", url_path="files"),
     "apps": st.Page(automation_page.render, title="Apps & Automation", icon=":material/smart_toy:", url_path="apps"),
+    "system": st.Page(system_page.render, title="System Manager", icon=":material/monitor_heart:", url_path="system"),
+    "voice": st.Page(voice_page.render, title="Voice Assistant", icon=":material/mic:", url_path="voice"),
     "history": st.Page(history_page.render, title="Activity & History", icon=":material/history:", url_path="history"),
     "settings": st.Page(settings_dialog.render, title="Settings", icon=":material/tune:", url_path="settings"),
     "manual": st.Page(manual_page.render, title="Manual", icon=":material/menu_book:", url_path="manual"),
 }
 st.session_state.pages = pages
 nav = st.navigation({"Agent": [pages["command"], pages["files"], pages["apps"]],
+                     "System": [pages["system"], pages["voice"]],
                      "Records & setup": [pages["history"], pages["settings"], pages["manual"]]})
 sidebar()
 nav.run()
+voice_page.play_pending()

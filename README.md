@@ -66,3 +66,13 @@ Push this folder to GitHub. Then on share.streamlit.io, choose **New app**, pick
 - [docs/SECURITY.md](docs/SECURITY.md)
 
 License: MIT (see LICENSE for third-party licenses).
+
+## System Manager & multilingual Voice Assistant (v1.2)
+
+- **System Manager** page: live CPU/RAM/disk/battery gauges, health score, per-core load, process manager
+  (end / force end with protected-process policy), drives, network, services, startup apps, volume & media keys,
+  Windows Settings shortcuts, lock / restart / shutdown (60 s, cancellable). All actions confirmed and logged.
+- **Voice Assistant** page (pure Python): `st.audio_input` → offline **Vosk** speech-to-text → intent router →
+  offline speech replies (Windows SAPI / bundled **espeak-ng**). 21 languages selectable, including **Urdu**
+  (Urdu script + Roman Urdu), Hindi, Arabic, Persian, Turkish, French, Spanish, German, Chinese, Russian and more.
+- Voice never executes directly: risky requests open a confirmation; agent tasks go through plan → policy → approval.

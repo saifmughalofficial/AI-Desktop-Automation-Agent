@@ -208,6 +208,20 @@ background:rgba(8,30,64,.5);border:1px solid rgba(56,189,248,.12);transition:all
 .vd-dots{display:inline-flex;gap:4px}.vd-dots i{width:9px;height:9px;border-radius:50%;background:#ff2d55;box-shadow:0 0 6px #ff2d55}
 .vd-dots i:nth-child(2){background:#fbbf24;box-shadow:0 0 6px #fbbf24}.vd-dots i:nth-child(3){background:#34d399;box-shadow:0 0 6px #34d399}
 [data-testid="stVerticalBlockBorderWrapper"]{background:rgba(6,14,36,.72);border-color:rgba(168,85,247,.35)!important;backdrop-filter:blur(6px);animation:hudIn .45s ease both}
+.gauges:has(.gauge:nth-child(4)){grid-template-columns:repeat(4,1fr)}
+.core-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:4px 14px}
+.v-orb-wrap{display:flex;flex-direction:column;align-items:center;padding:10px 0 6px}
+.v-orb{position:relative;width:138px;height:138px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,rgba(56,189,248,.55),rgba(124,58,237,.35) 45%,rgba(225,29,72,.25) 70%,transparent 72%);box-shadow:0 0 40px rgba(56,189,248,.35),0 0 70px rgba(255,45,85,.18) inset;animation:vPulse 2.6s ease-in-out infinite}
+.v-orb svg{width:46px;height:46px;fill:none;stroke:#e6f6ff;stroke-width:1.8;filter:drop-shadow(0 0 8px #38bdf8)}
+.v-orb i{position:absolute;inset:-8px;border-radius:50%;border:1.5px solid rgba(56,189,248,.45);animation:vRing 3s linear infinite}
+.v-orb i:nth-child(2){inset:-18px;border-color:rgba(168,85,247,.4);animation-delay:1s;border-style:dashed}
+.v-orb i:nth-child(3){inset:-28px;border-color:rgba(255,45,85,.35);animation-delay:2s}
+.v-wave{display:flex;gap:3px;height:34px;align-items:center;margin-top:30px}
+.v-wave i{width:4px;height:8px;border-radius:3px;background:linear-gradient(#38bdf8,#ff2d55);animation:vBar 1.1s ease-in-out infinite}
+.v-cap{font-family:Rajdhani;color:#9cc8e6;font-size:.9rem;margin-top:6px;letter-spacing:.04em}
+@keyframes vPulse{50%{transform:scale(1.05);box-shadow:0 0 60px rgba(56,189,248,.5),0 0 90px rgba(255,45,85,.25) inset}}
+@keyframes vRing{0%{transform:scale(.9) rotate(0);opacity:.9}100%{transform:scale(1.25) rotate(360deg);opacity:0}}
+@keyframes vBar{0%,100%{height:6px}50%{height:30px}}
 .manual h2{margin-top:1.4rem!important}
 .manual table{width:100%;border-collapse:collapse;font-size:.9rem}.manual td,.manual th{border:1px solid rgba(56,189,248,.18);padding:6px 9px}
 .manual th{background:rgba(14,116,144,.25);font-family:'Rajdhani';letter-spacing:.06em}

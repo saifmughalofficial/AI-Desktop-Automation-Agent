@@ -13,6 +13,7 @@ from app.core.orchestrator import Orchestrator
 from app.core.permissions import Permissions
 from app.core.planner import Planner
 from app.core.policy_engine import PolicyEngine
+from app.core.system_manager import SystemManager
 from app.core.system_monitor import SystemMonitor
 from app.actions.virtual_desktop import VirtualDesktop
 from app.demo_seed import copy_demo_to, seed_demo_workspace
@@ -39,6 +40,8 @@ class Services:
     orchestrator: Orchestrator
     db: Database
     monitor: SystemMonitor = field(default_factory=SystemMonitor)
+    system: SystemManager | None = None  # whole-system management (read-only when hosted)
+    voice_dir: Path | None = None  # shared folder for the offline speech model
 
     def apply_settings(self, settings: Settings, save: bool = True) -> None:
         """Validate-and-swap: rebuild the policy stack from new settings; keep history/monitor/app handles."""
@@ -81,5 +84,7 @@ def build_services(*, hosted: bool | None = None, data_dir: Path | None = None,
     svc = Services(hosted=hosted, workspace=workspace, data_dir=data_dir, store=store, settings=settings,
                    perms=perms, policy=policy, llm=llm, planner=Planner(settings, perms, policy, llm),
                    orchestrator=Orchestrator(settings, perms, policy, db, VirtualDesktop() if hosted else None), db=db)
+    svc.system = SystemManager(hosted, db)
+    svc.voice_dir = (Path(tempfile.gettempdir()) / "desktop_agent_shared") if hosted else data_dir
     log_event("services_started", hosted=hosted)
     return svc
