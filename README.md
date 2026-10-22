@@ -33,7 +33,7 @@ The full instruction manual is in **`docs/User_Manual.pdf`**. It is also in the 
 
 ```
 desktop-agent/
-├── streamlit_app.py        # UI entry point (also the Streamlit Cloud main file)
+├── app.py                  # UI entry point = Streamlit Cloud main file (streamlit_app.py is an alias)
 ├── setup.bat / run.bat     # Windows setup and launcher (port 8797)
 ├── run_tests.bat / build_exe.bat
 ├── app/
@@ -53,7 +53,7 @@ desktop-agent/
 
 ## Deploy on Streamlit Community Cloud
 
-Push this folder to GitHub. Then on share.streamlit.io, choose **New app**, pick the repo and set the main file to `streamlit_app.py`. The hosted app runs in **sandbox mode**: each visitor gets a private copy of the demo workspace and per-session settings and history. Desktop control is disabled, because a web server cannot control a visitor's PC. Use `run.bat` for the full desktop agent.
+Push this folder to GitHub. Then on share.streamlit.io, choose **New app**, pick the repo and set **Main file path** to `app.py`. The hosted app runs in **sandbox mode**: each visitor gets a private copy of the demo workspace and per-session settings and history. Desktop control is disabled, because a web server cannot control a visitor's PC. Use `run.bat` for the full desktop agent.
 
 ## Tests
 

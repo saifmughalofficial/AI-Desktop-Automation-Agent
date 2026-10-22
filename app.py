@@ -1,7 +1,7 @@
 """AI Desktop Automation Agent — Streamlit entry point.
 
-Local:  run.bat  (or: streamlit run streamlit_app.py --server.port 8797)
-Cloud:  set the main file to streamlit_app.py on share.streamlit.io
+Local:  run.bat  (or: streamlit run app.py --server.port 8797)
+Cloud:  main file path = app.py on share.streamlit.io
 """
 from __future__ import annotations
 

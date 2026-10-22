@@ -25,7 +25,7 @@ def main() -> int:
         return 0
     from streamlit.web import cli as stcli
 
-    sys.argv = ["streamlit", "run", str(PROJECT_ROOT / "streamlit_app.py"),
+    sys.argv = ["streamlit", "run", str(PROJECT_ROOT / "app.py"),
                 "--server.port", str(LOCAL_PORT), "--server.address", "127.0.0.1",
                 "--server.headless", "false", "--browser.gatherUsageStats", "false"]
     print(f"Starting AI Desktop Automation Agent at {url}  (close this window to stop)")

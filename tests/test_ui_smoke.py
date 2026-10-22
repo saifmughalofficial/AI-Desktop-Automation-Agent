@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
-APP = str(Path(__file__).resolve().parent.parent / "streamlit_app.py")
+APP = str(Path(__file__).resolve().parent.parent / "app.py")
 
 
 @pytest.fixture(autouse=True)

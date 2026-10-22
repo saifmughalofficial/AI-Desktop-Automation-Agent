@@ -7,3 +7,5 @@ dist/
 *.spec
 demo_workspace/.agent_trash/
 .pytest_cache/
+# old nested copy of the project (the app lives at the repo root)
+desktop-agent/

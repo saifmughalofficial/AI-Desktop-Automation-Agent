@@ -1,2 +1,0 @@
-Welcome to the AI Desktop Automation Agent demo workspace.
-Everything in this folder is fake sample data — safe to rename, move and organize.

@@ -158,7 +158,7 @@ The policy engine, not the language model, decides risk and approval. A model's 
 ## 15. Deploying on Streamlit Community Cloud
 
 - Push the desktop-agent folder to a GitHub repository (it already contains requirements.txt and .streamlit/config.toml).
-- On share.streamlit.io choose New app, select the repo and set the main file to streamlit_app.py.
+- On share.streamlit.io choose Create app > Deploy a public app from GitHub, pick the repo, branch main, and type app.py as the Main file path.
 - The hosted app runs in 'sandbox mode': every visitor gets a private copy of the demo workspace, settings and history are per session, and desktop control is disabled because a web server cannot control a visitor's PC. Use run.bat locally for the full desktop agent.
 
 ## 16. Troubleshooting
