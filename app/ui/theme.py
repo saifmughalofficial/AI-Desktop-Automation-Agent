@@ -270,7 +270,7 @@ def fx_script(dual: bool, animate: bool, enabled: bool, roots: int, apps: int) -
 var C = __CFG__;
 var S = window.__agentFx = window.__agentFx || {};
 S.dual = C.dual; S.anim = C.anim; S.on = C.on;
-var doc = window.parent && window.parent.document ? window.parent.document : document;
+var doc = document;  // the app's own document (on Streamlit Cloud the app runs inside an iframe)
 try { doc.body.dataset.palette = C.dual ? 'dual' : 'blue'; } catch (e) {}
 var cv = doc.getElementById('agent-fx-bg');
 if (cv) { cv.style.display = C.on ? 'block' : 'none'; if (S.redraw) S.redraw(); }

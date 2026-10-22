@@ -14,6 +14,7 @@ def test_fx_script_survives_streamlit_sanitizer():
         src = fx_script(dual, True, True, 1, 5)
         body = src.split("<script>", 1)[1].rsplit("</script>", 1)[0]
         assert not re.search(r"<[A-Za-z0-9/]", body), "a '<' followed by a letter/digit/'/' would get the script dropped"
+        assert "window.parent" not in body, "must draw into the app document (Cloud wraps the app in an iframe)"
 
 
 def test_undo_phrases():
