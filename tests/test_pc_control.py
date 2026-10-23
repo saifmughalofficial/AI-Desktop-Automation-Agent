@@ -132,3 +132,10 @@ def test_default_browser_is_chrome_new_tab(monkeypatch):
 def test_web_browser_setting_default(svc):
     assert svc.settings.web_browser == "chrome"
     assert "new tab" in svc.planner.plan("open youtube.com").steps[0].description
+
+
+def test_website_named_like_messenger_is_not_a_draft(svc):
+    for text, url in [("Open whatsapp.com in Chrome", "https://whatsapp.com"), ("open gmail", "https://mail.google.com"),
+                      ("open whatsapp", "https://web.whatsapp.com")]:
+        p = svc.planner.plan(text)
+        assert p.steps and p.steps[0].action.action == "open_url" and p.steps[0].action.url == url, (text, p.clarification)

@@ -35,6 +35,8 @@ SITES = {
     "spotify": "https://open.spotify.com", "tiktok": "https://www.tiktok.com", "pinterest": "https://www.pinterest.com",
     "telegram": "https://web.telegram.org", "discord": "https://discord.com/app", "news": "https://news.google.com",
     "weather": "https://www.google.com/search?q=weather", "streamlit": "https://streamlit.io",
+    "email": "https://mail.google.com", "my email": "https://mail.google.com", "mail": "https://mail.google.com",
+    "deepseek": "https://chat.deepseek.com", "gemini": "https://gemini.google.com", "copilot": "https://copilot.microsoft.com",
 }
 ENGINES = {
     "google": "https://www.google.com/search?q={q}", "youtube": "https://www.youtube.com/results?search_query={q}",

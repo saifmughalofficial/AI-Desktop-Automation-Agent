@@ -67,3 +67,18 @@ def test_system_question_answered(lis):
 def test_refusals_spoken(lis):
     lis.handle(["sign in to my facebook"])
     assert "never signs in" in said(lis)[-1]
+
+
+def test_command_words_beat_misheard_unknown_words(lis):
+    lis.set_vocab(["minimize", "chrome", "switch", "to", "open", "notepad", "[unk]"])
+    alts = lis.candidates({"alternatives": [{"text": "minimize crow"}, {"text": "minimize chrome"}],
+                           "grammar": "minimize chrome"})
+    assert "minimize chrome" in alts and lis._choose(alts)[0] == "minimize chrome"
+    text, _, plan = lis._choose(["switch two crow", "switch two chrome"])
+    assert text == "switch to chrome"
+
+
+def test_normalize_more_slips():
+    assert normalize("what is my cp you usage") == "what is my cpu usage"
+    assert normalize("search youtube for low-fee music") == "search youtube for lofi music"
+    assert normalize("go two get hub") == "go to github"

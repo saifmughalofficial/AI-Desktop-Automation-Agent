@@ -19,6 +19,9 @@ from app.voice.i18n import deva_to_urdu, lang_info
 
 MODEL_NAME = "vosk-model-small-en-us-0.15"
 MODEL_BASE = "https://alphacephei.com/vosk/models/"
+# Faster mirror (same files) — tried first; the official server is used as the fallback.
+MIRRORS = {"vosk-model-en-us-0.22-lgraph": "https://huggingface.co/rhasspy/vosk-models/resolve/main/en/",
+           "vosk-model-small-en-us-0.15": "https://huggingface.co/rhasspy/vosk-models/resolve/main/en/"}
 _lock = threading.Lock()
 _models: dict = {}
 
@@ -57,14 +60,21 @@ def download_model(data_dir: Path, progress=None, lang: str = "en") -> Path:
     name = model_name(lang)
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.parent / (name + ".zip.part")
-    with urllib.request.urlopen(MODEL_BASE + name + ".zip", timeout=60) as r, open(tmp, "wb") as f:  # noqa: S310 - fixed https URL
-        total = int(r.headers.get("Content-Length") or 0)
-        done = 0
-        while chunk := r.read(1 << 16):
-            f.write(chunk)
-            done += len(chunk)
-            if progress and total:
-                progress(done / total)
+    bases = [b for b in (MIRRORS.get(name), MODEL_BASE) if b]
+    for i, base in enumerate(bases):
+        try:
+            with urllib.request.urlopen(base + name + ".zip", timeout=60) as r, open(tmp, "wb") as f:  # noqa: S310
+                total = int(r.headers.get("Content-Length") or 0)
+                done = 0
+                while chunk := r.read(1 << 16):
+                    f.write(chunk)
+                    done += len(chunk)
+                    if progress and total:
+                        progress(done / total)
+            break
+        except OSError:
+            if i == len(bases) - 1:
+                raise
     with zipfile.ZipFile(tmp) as z:
         for m in z.namelist():  # zip-slip guard
             if Path(m).is_absolute() or ".." in Path(m).parts:

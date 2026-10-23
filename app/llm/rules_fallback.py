@@ -739,7 +739,7 @@ def _p_web(c, ctx, res):
         if not q:
             raise NeedsClarification("What should I search for?", "generic")
         return [A.OpenUrl(url=pc_control.search_url(q, engine), browser=browser)]
-    m = re.match(r"^(?:open|go to|goto|visit|browse to|browse|navigate to|load|launch|start|show me|take me to|bring up)\s+"
+    m = re.match(r"^(?:open|go to|goto|go|visit|browse to|browse|navigate to|load|launch|start|show me|take me to|bring up)\s+"
                  r"(?:the\s+|my\s+)?(?P<t>.+?)(?P<w>\s+(?:website|web ?site|site|web ?page|page|homepage|home page))?$", c2, re.I)
     if not m:
         if browser != "default" and pc_control.normalize_url(c2):
@@ -764,9 +764,12 @@ _CHANNELS = {"gmail": "gmail", "outlook": "outlook", "whatsapp": "whatsapp", "em
 
 
 def _p_compose(c, ctx, res):
-    m = (re.match(r"^(?:draft|compose|write|prepare|create|make|start|open)\s+(?:up\s+)?(?:a\s+|an\s+|new\s+)*"
-                  r"(?P<ch>gmail|outlook|whatsapp|e-mail|email|mail)(?:\s+(?:email|e-mail|mail|message|msg|draft))?\b(?P<rest>.*)$",
-                  c, re.I)
+    if re.search(r"\b(?:gmail|outlook|whatsapp|mail)\.\w", c, re.I) or re.search(r"https?://", c, re.I):
+        return None  # 'open whatsapp.com' is a website, not a draft
+    m = (re.match(r"^(?:draft|compose|write|prepare|create|make|start|open\s+(?:a\s+|an\s+)?(?:new\s+)?(?:draft|compose))"
+                  r"\s+(?:up\s+)?(?:a\s+|an\s+|new\s+)*"
+                  r"(?P<ch>gmail|outlook|whatsapp|e-mail|email|mail)(?![.\w])(?:\s+(?:email|e-mail|mail|message|msg|draft))?"
+                  r"\b(?P<rest>.*)$", c, re.I)
          or re.match(r"^(?:draft|compose|write|prepare)\s+(?:a\s+|an\s+)?(?:message|msg|text|note)\s+(?:on|via|in|using|through)\s+"
                      r"(?P<ch>whatsapp|gmail|outlook|e-?mail)\b(?P<rest>.*)$", c, re.I))
     if not m or re.search(r"\b(?:folders?|director(?:y|ies)|files?|zip)\b", m.group("rest") or "", re.I):

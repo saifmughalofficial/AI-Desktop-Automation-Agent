@@ -47,7 +47,7 @@
   "background_fx": true,
   "web_browser": "chrome",
   "voice_handsfree": true,
-  "voice_lang": "en-hq",
+  "voice_lang": "en",
   "voice_speak": true,
   "voice_confirm_by_voice": true
 }
