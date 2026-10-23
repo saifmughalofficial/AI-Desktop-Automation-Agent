@@ -226,15 +226,95 @@ class TypeText(_Strict):
     text: str = Field(min_length=1, max_length=2000)
 
 
+_EXEC_URL = re.compile(r"\.(exe|msi|bat|cmd|ps1|vbs|scr|jar|apk|dmg|com|hta)(?:$|[?#])", re.I)
+_EMAIL = re.compile(r"^[^@\s,;]+@[^@\s,;]+\.[a-z]{2,}$", re.I)
+
+
+class OpenUrl(_Strict):
+    """Open a web page (http/https only) in the default or a named browser."""
+    action: Literal["open_url"] = "open_url"
+    url: str = Field(min_length=8, max_length=2048)
+    browser: Literal["default", "chrome", "edge", "firefox"] = "default"
+
+    @field_validator("url")
+    @classmethod
+    def check_url(cls, v: str) -> str:
+        from urllib.parse import urlsplit
+        v = v.strip()
+        if any(ord(c) < 33 for c in v):
+            raise ValueError("URLs cannot contain spaces or control characters")
+        u = urlsplit(v)
+        if u.scheme.lower() not in {"http", "https"} or not u.hostname:
+            raise ValueError("only http:// and https:// web addresses can be opened")
+        if u.username or u.password:
+            raise ValueError("URLs with embedded user names or passwords are refused")
+        if _EXEC_URL.search(u.path or ""):
+            raise ValueError("links that download programs or scripts are refused")
+        return v
+
+
+class ComposeMessage(_Strict):
+    """Open a pre-filled draft (email / Gmail / Outlook / WhatsApp). The user reviews and sends it themselves."""
+    action: Literal["compose_message"] = "compose_message"
+    channel: Literal["email", "gmail", "outlook", "whatsapp"] = "email"
+    to: str = Field("", max_length=300)
+    subject: str = Field("", max_length=200)
+    body: str = Field("", max_length=4000)
+
+    @model_validator(mode="after")
+    def _check(self):
+        to = self.to.strip()
+        if self.channel == "whatsapp":
+            if to and not re.fullmatch(r"\+?[\d\s()-]{7,20}", to):
+                raise ValueError("a WhatsApp recipient must be a phone number with country code, e.g. +923001234567")
+        else:
+            for addr in filter(None, (a.strip() for a in re.split(r"[;,]", to))):
+                if not _EMAIL.match(addr):
+                    raise ValueError(f"{addr!r} is not a valid email address")
+        if not (self.body.strip() or self.subject.strip()):
+            raise ValueError("a draft needs a message text")
+        return self
+
+
+class LaunchProgram(_Strict):
+    """Start an installed program found in the Start menu (not on the allowlist, so it needs approval)."""
+    action: Literal["launch_program"] = "launch_program"
+    name: str = Field(min_length=1, max_length=100)
+
+
+class ListWindows(_Strict):
+    action: Literal["list_windows"] = "list_windows"
+    filter: str = Field("", max_length=60)
+
+
+class WindowControl(_Strict):
+    action: Literal["window_control"] = "window_control"
+    op: Literal["focus", "minimize", "maximize", "restore", "close"]
+    window: str = Field(min_length=1, max_length=120)
+
+
+class BrowserTab(_Strict):
+    action: Literal["browser_tab"] = "browser_tab"
+    op: Literal["new", "close", "next", "previous", "reload"]
+    browser: Literal["any", "chrome", "edge", "firefox"] = "any"
+
+
+class TakeScreenshot(_Strict):
+    action: Literal["take_screenshot"] = "take_screenshot"
+    destination: PathRef  # folder that receives screenshot_<timestamp>.png
+
+
 Action = Annotated[
     Union[ListFiles, FindDuplicates, CreateFolder, CopyFile, MoveFile, RenameFile, DeleteFile,
-          WriteTextFile, ArchiveFolder, LaunchApp, OpenFile, OpenFolder, InspectUI, TypeText],
+          WriteTextFile, ArchiveFolder, LaunchApp, OpenFile, OpenFolder, InspectUI, TypeText, OpenUrl,
+          ComposeMessage, LaunchProgram, ListWindows, WindowControl, BrowserTab, TakeScreenshot],
     Field(discriminator="action"),
 ]
 ACTION_ADAPTER: TypeAdapter = TypeAdapter(Action)
 ACTION_NAMES = ["list_files", "find_duplicates", "create_folder", "copy_file", "move_file", "rename_file",
                 "delete_file", "write_text_file", "archive_folder", "launch_app", "open_file", "open_folder",
-                "inspect_ui", "type_text"]
+                "inspect_ui", "type_text", "open_url", "compose_message", "launch_program", "list_windows",
+                "window_control", "browser_tab", "take_screenshot"]
 
 
 # --------------------------------------------------------------------------- macros

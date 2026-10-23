@@ -1,6 +1,6 @@
 # AI Desktop Automation Agent — User & Instruction Manual
 
-Version 1.2.0. The PDF version is `docs/User_Manual.pdf`.
+Version 1.3.0. The PDF version is `docs/User_Manual.pdf`.
 
 ## 1. What the agent does
 
@@ -200,3 +200,25 @@ Voice Assistant (sidebar → Voice) lets you speak or type commands. Pick the as
 - Examples: system status · CPU usage · top processes · battery · disk space · volume up · mute · open display settings · close Notepad process · lock the screen · go to history · what time is it.
 - Anything else (e.g. “open Notepad”, “organize my Downloads by type”) is sent to the agent, which shows the plan in the Command Center for your normal review and approval.
 - Voice never executes anything directly: risky actions open a confirmation dialog, and speech text is only matched against keyword tables.
+
+## 20. Browser, drafts, programs and windows
+
+The agent can now work across the whole PC. Every request still becomes a plan you review, and the policy engine checks every step.
+
+| You say | What happens | Risk |
+|---|---|---|
+| open youtube.com / go to github / open github.com in Chrome | Opens the site (http/https only) | LOW |
+| search YouTube for lofi · google weather in Lahore · look up X on wikipedia | Opens the search results | LOW |
+| draft a Gmail to a@b.com about Lunch saying See you at 1 | Opens a pre-filled draft — you press Send | MEDIUM |
+| draft a WhatsApp message to +923001234567 saying hello | Opens WhatsApp with the text filled in | MEDIUM |
+| open vs code · open word · open chrome | Starts an installed Start-menu program | MEDIUM |
+| list open windows · what's open | Table of window titles and programs | LOW |
+| minimize / maximize / restore / switch to Chrome | Changes the window and reads its state back | LOW |
+| close the Notepad window | Closes politely, like clicking X (save prompts still appear) | MEDIUM |
+| new tab · close this tab · next tab · reload the page | Sends the browser shortcut | LOW/MEDIUM |
+| take a screenshot (into Photos) | Saves a PNG inside an approved folder (Undo removes it) | MEDIUM |
+
+- Accuracy: typos in the first word are corrected ("opne notpad" → open Notepad), app, program and folder names are matched to the closest name, and every correction is listed under Assumptions. File names are never guessed — you get a "did you mean …?" question instead.
+- The agent never signs in to accounts, types passwords, sends, posts, uploads or buys. Such requests are refused with a hint; drafts are opened for you to review and send yourself.
+- Links that download programs, javascript:/file: links and URLs with embedded passwords are refused.
+- On the website, pages and drafts appear as link windows in the web virtual desktop; program, window, tab and screenshot control work only when the agent runs locally on Windows.

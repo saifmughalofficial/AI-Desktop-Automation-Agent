@@ -75,6 +75,18 @@ class VirtualDesktop:
     def open_folder(self, display: str, rows: list[dict]) -> dict:
         return self._new("explorer", f"{display} - File Explorer", rows=rows)
 
+    def open_link(self, title: str, url: str, draft: dict | None = None) -> dict:
+        from urllib.parse import urlsplit
+        host = urlsplit(url).hostname or "link"
+        name = title if title != url else f"{host} - Browser"
+        return self._new("link", name, url=url, draft=draft or {})
+
+    def find(self, query: str) -> dict | None:
+        q = query.strip().lower()
+        q = q.removesuffix(" window").removeprefix("the ").strip()
+        hits = [w for w in self.windows.values() if q and (q in w["title"].lower() or q == w["kind"])]
+        return hits[-1] if hits else None
+
     def close(self, wid: str) -> None:
         with self._lock:
             self.windows.pop(wid, None)

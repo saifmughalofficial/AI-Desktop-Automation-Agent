@@ -24,6 +24,8 @@ BASE_RISK: dict[str, Risk] = {
     "copy_file": Risk.MEDIUM, "move_file": Risk.MEDIUM, "rename_file": Risk.MEDIUM,
     "write_text_file": Risk.MEDIUM, "archive_folder": Risk.MEDIUM, "type_text": Risk.MEDIUM,
     "delete_file": Risk.HIGH,
+    "open_url": Risk.LOW, "list_windows": Risk.LOW, "window_control": Risk.LOW, "browser_tab": Risk.LOW,
+    "compose_message": Risk.MEDIUM, "launch_program": Risk.MEDIUM, "take_screenshot": Risk.MEDIUM,
 }
 
 EXECUTABLE_EXTS = {
@@ -48,6 +50,12 @@ _SCREEN_RULES: list[tuple[str, Risk, re.Pattern, str]] = [
      re.compile(r"\b(passwords?|passwd|credentials?|cookies?|session tokens?|api keys?|private keys?|keylog\w*|"
                 r"steal\w*|harvest\w*|crack(ing)?|dump (the )?(hashes|sam|lsass))\b", re.I),
      "Accessing, collecting or exporting passwords, cookies, tokens or other secrets is blocked."),
+    ("account_access", Risk.BLOCKED,
+     re.compile(r"\b(sign|log)\s?(me\s)?(in|into|on)\b.{0,50}\b(account|facebook|instagram|whatsapp|gmail|google|"
+                r"twitter|linkedin|tiktok|snapchat|telegram|outlook|bank|amazon|netflix|for me|with my|as me)\b|"
+                r"\b(enter|type|fill in|use) (my |the )?(password|login|credentials|otp|2fa|pin)\b", re.I),
+     "The agent never signs in to accounts or enters passwords for you. Say e.g. 'open facebook.com' and sign in "
+     "yourself — the agent can then help with drafts, tabs and windows."),
     ("security_bypass", Risk.BLOCKED,
      re.compile(r"\b(disable|turn off|bypass|kill|stop|evade)\b.{0,40}\b(antivirus|defender|firewall|uac|"
                 r"smartscreen|security|edr)\b|\b(exploit|privilege escalation|backdoor|rootkit|ransomware|malware)\b", re.I),
@@ -60,7 +68,7 @@ _SCREEN_RULES: list[tuple[str, Risk, re.Pattern, str]] = [
     ("shell", Risk.BLOCKED,
      re.compile(r"\b(powershell|pwsh|cmd(\.exe)?|command prompt|bash|shell command|regsvr32|rundll32|mshta|"
                 r"(execute|run) (a |the |this |my )?(script|command|code|program|binary)|eval|exec)\b|"
-                r"\b(run|execute|start|open|launch)\s+\S+\.(exe|bat|cmd|ps1|vbs|msi|scr|py|js|jar|com)\b", re.I),
+                r"\b(run|execute|start|open|launch)\s+[^\s/]+\.(exe|bat|cmd|ps1|vbs|msi|scr|py|js|jar)\b", re.I),
      "Running arbitrary commands, scripts or executables is not allowed. Only registered actions and "
      "allowlisted applications can run."),
     ("destructive_bulk", Risk.BLOCKED,
@@ -80,7 +88,8 @@ _SCREEN_RULES: list[tuple[str, Risk, re.Pattern, str]] = [
                 r"\b(email|e-mail|mail) (it|this|them|the|my)\b|\b(upload|tweet|publish|purchase|buy|pay for|"
                 r"checkout)\b|\bshare\b.{0,30}\b(with|online|on|link)\b|"
                 r"\bpost\b.{0,25}\b(facebook|twitter|linkedin|instagram|reddit|slack|teams|discord)\b", re.I),
-     "Sending messages, uploading, sharing or purchasing are external side effects this agent does not perform."),
+     "The agent never sends, posts, uploads or buys on your behalf. Say 'draft an email to …' or 'draft a "
+     "WhatsApp message …' and it opens a pre-filled draft that you review and send yourself."),
 ]
 
 
@@ -295,6 +304,54 @@ class PolicyEngine:
             chk.violation = f"Folder {a.target.display()} does not exist."
         else:
             self._need_desktop(chk)
+
+    # ------------------------------------------------------------------ web, programs, windows
+    def _check_open_url(self, a: A.OpenUrl, sim, chk: StepCheck) -> None:
+        from urllib.parse import urlsplit
+        chk.targets = [urlsplit(a.url).hostname or a.url]
+        if self.hosted:
+            chk.note = "Cloud sandbox: the page appears as a link window — click it to open it in your browser."
+
+    def _check_compose_message(self, a: A.ComposeMessage, sim, chk: StepCheck) -> None:
+        chk.targets = [f"{a.channel}: {a.to or '(you choose the recipient)'}"]
+        chk.note = "Opens a pre-filled draft only — the agent never sends. Review it and press Send yourself."
+
+    def _check_launch_program(self, a: A.LaunchProgram, sim, chk: StepCheck) -> None:
+        from app.actions import pc_control
+        chk.targets = [a.name]
+        if not self._need_desktop(chk, web_ok=False):
+            return
+        if a.name not in pc_control.program_index():
+            best, alts = pc_control.find_program(a.name)
+            chk.violation = (f"'{a.name}' is not an installed Start-menu program"
+                             + (f" — did you mean {', '.join(alts or [best])}?" if (alts or best) else "."))
+            return
+        chk.note = "Installed program that is not on the allowlist, so it needs your approval."
+
+    def _check_list_windows(self, a: A.ListWindows, sim, chk: StepCheck) -> None:
+        chk.targets = ["open windows"]
+        self._need_desktop(chk, web_ok=True)
+
+    def _check_window_control(self, a: A.WindowControl, sim, chk: StepCheck) -> None:
+        chk.targets = [a.window]
+        if a.op == "close":
+            chk.risk = Risk.MEDIUM
+        if self._need_desktop(chk, web_ok=True) and a.op == "close" and not self.hosted:
+            chk.note = "Closes politely (like clicking X) — the app can still ask you to save unsaved work."
+
+    def _check_browser_tab(self, a: A.BrowserTab, sim, chk: StepCheck) -> None:
+        chk.targets = [f"{a.browser} browser"]
+        if a.op == "close":
+            chk.risk = Risk.MEDIUM
+        self._need_desktop(chk, web_ok=False)
+
+    def _check_take_screenshot(self, a: A.TakeScreenshot, sim: Simulation, chk: StepCheck) -> None:
+        p = self.perms.resolve(a.destination, write=True)
+        chk.targets = [a.destination.display()]
+        if not sim.is_dir(p):
+            chk.violation = f"Folder {a.destination.display()} does not exist."
+        elif self._need_desktop(chk, web_ok=False):
+            chk.note = "Captures everything visible on your screen(s) into a PNG inside the approved folder."
 
     # ------------------------------------------------------------------ whole plans
     def evaluate(self, plan: Plan) -> Plan:

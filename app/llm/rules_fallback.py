@@ -7,11 +7,13 @@ way a model's is: every step still goes through schema validation and the
 policy engine."""
 from __future__ import annotations
 
+import difflib
 import re
 from dataclasses import dataclass, field
 
 from pydantic import ValidationError
 
+from app.actions import pc_control
 from app.actions.filesystem import ARCHIVE_EXTS, AUDIO_EXTS, CODE_EXTS, DOC_EXTS, IMAGE_EXTS, KNOWN_EXTS, VIDEO_EXTS
 from app.config.settings import AppEntry, Workflow
 from app.core import action_schema as A
@@ -32,11 +34,18 @@ EXAMPLES = [
     "Search for notes in Demo",
     "Run workflow Workspace Report",
     "Undo the last run",
+    "Search YouTube for lofi music",
+    "Open github.com in Chrome",
+    "Draft a Gmail to someone@example.com about Meeting saying See you at 5",
+    "Minimize Chrome",
+    "List open windows",
+    "Take a screenshot",
 ]
 
 UNKNOWN_MSG = ("I couldn't match that to a supported action. Try for example: 'list files in Downloads', "
-               "'create a folder named Reports in Projects', 'copy all pdf files from Downloads to Documents', "
-               "'open Notepad' — the Manual page lists every supported command.")
+               "'copy all pdf files from Downloads to Documents', 'open Notepad', 'open youtube.com', "
+               "'search Google for weather', 'minimize Chrome', 'take a screenshot', 'draft an email to a@b.com "
+               "saying hi' — the Manual page lists every supported command.")
 
 
 class NeedsClarification(Exception):
@@ -53,6 +62,8 @@ class ParseContext:
     workflows: list[Workflow] = field(default_factory=list)
     selection: list[PathRef] = field(default_factory=list)
     current: PathRef | None = None
+    programs: list[str] = field(default_factory=list)  # installed Start-menu programs (local Windows only)
+    fixes: list[str] = field(default_factory=list)  # auto-corrections made while parsing (shown as assumptions)
 
 
 @dataclass
@@ -218,7 +229,15 @@ def _resolve_location(phrase: str, ctx: ParseContext) -> PathRef:
         shown = ", ".join(m.display() for m in matches[:6])
         raise NeedsClarification(f"'{p}' matches several folders: {shown}. Which one? (e.g. '{matches[0].display()}')",
                                  "location")
-    raise NeedsClarification(f"I can't find a folder called '{p}' inside the approved folders ({_aliases(ctx)}). "
+    lower = {d.name.lower(): d for d in ctx.index.all_dirs()} | {r.root.lower(): r for r in ctx.index.roots}
+    close = difflib.get_close_matches(p.lower(), list(lower), n=3, cutoff=0.72)
+    if close and difflib.SequenceMatcher(None, p.lower(), close[0]).ratio() >= 0.86 and \
+            (len(close) == 1 or difflib.SequenceMatcher(None, p.lower(), close[1]).ratio() < 0.86):
+        ref = lower[close[0]]
+        ctx.fixes.append(f"Read the folder '{p}' as {ref.display()} (closest match).")
+        return ref
+    hint = f" Did you mean {' or '.join(repr(lower[c].name) for c in close)}?" if close else ""
+    raise NeedsClarification(f"I can't find a folder called '{p}' inside the approved folders ({_aliases(ctx)}).{hint} "
                              "Add it in Settings → Approved folders, or name an existing folder.", "location")
 
 
@@ -265,7 +284,10 @@ def _resolve_item(name: str, ctx: ParseContext, within: PathRef | None) -> PathR
         shown = ", ".join(m.display() for m in matches[:6])
         raise NeedsClarification(f"Several items are named '{raw}': {shown}. Which one? Add 'in <folder>'.", "location")
     where = f" in {within.display()}" if within else " in the approved folders"
-    raise NeedsClarification(f"I couldn't find '{raw}'{where}.", "generic")
+    names = sorted({f.name for f in ctx.index.files})
+    close = difflib.get_close_matches(raw, names, n=3, cutoff=0.7)
+    hint = f" Did you mean {' or '.join(repr(c) for c in close)}?" if close else ""
+    raise NeedsClarification(f"I couldn't find '{raw}'{where}.{hint}", "generic")
 
 
 def _selection(text: str, ctx: ParseContext, exts: list[str]) -> list[PathRef] | None:
@@ -556,6 +578,12 @@ def _p_open(c, ctx, res):
             return [A.OpenFile(target=ref)]
         return [A.OpenFolder(target=ref)]
     app = None if explorer else _match_app(what, ctx.apps)
+    if not app and not explorer and "." not in what:
+        names = {a.name.lower(): a for a in ctx.apps}
+        close = difflib.get_close_matches(what.lower(), list(names), n=1, cutoff=0.8)
+        if close:
+            app = names[close[0]]
+            res.assumptions.append(f"Read '{what}' as {app.name}.")
     if app:
         res.last_app = app.name
         return [A.LaunchApp(app=app.name)]
@@ -573,9 +601,19 @@ def _p_open(c, ctx, res):
             pass
     elif within:
         return [A.OpenFolder(target=within)]
+    alts: list[str] = []
+    if ctx.programs and not explorer:
+        best, alts = pc_control.find_program(what, ctx.programs)
+        if best:
+            if best.lower() != what.lower():
+                res.assumptions.append(f"Matched '{what}' to the installed program {best}.")
+            res.last_app = best
+            return [A.LaunchProgram(name=best)]
     apps = ", ".join(a.name for a in ctx.apps) or "none"
-    raise NeedsClarification(f"'{what}' isn't an allowlisted application or a file/folder I can find. Allowlisted "
-                             f"apps: {apps}. More can be added in Settings → Applications.", "generic")
+    hint = f" Did you mean: {', '.join(alts)}?" if alts else ""
+    raise NeedsClarification(f"'{what}' isn't an allowlisted application, installed program, website or a file/folder "
+                             f"I can find.{hint} Allowlisted apps: {apps}. Websites work too, e.g. 'open youtube.com'.",
+                             "generic")
 
 
 def _p_create_file(c, ctx, res):
@@ -622,6 +660,10 @@ def _p_create_folder(c, ctx, res):
         m = re.search(r"\b(?:folders?|director(?:y|ies)|subfolders?)\s+(?:named\s+|called\s+)?(?P<n>.+)$", rest, re.I)
         raw = m.group("n").strip() if m else ""
         raw = re.sub(r"\s+(?:folders?|directory)$", "", raw, flags=re.I).strip(" .,")
+        if not raw:  # 'make a mail folder' / 'create new Reports folder'
+            m2 = re.search(r"\b(?:create|make|add|new|build|prepare)\s+(?:a\s+|an\s+|new\s+)*(?P<n>[\w\-]+(?:\s+[\w\-]+)?)\s+"
+                           r"(?:folder|directory|subfolder)\b", rest, re.I)
+            raw = m2.group("n").strip() if m2 and m2.group("n").lower() not in {"a", "an", "new", "the"} else ""
     q = re.fullmatch(r"(['\"])(.+)\1", raw.strip())
     names = [q.group(2)] if q else [_unq(n) for n in re.split(r"\s*,\s*(?:and\s+)?|\s+and\s+", raw) if _unq(n)]
     if not names:
@@ -668,8 +710,178 @@ def _p_list(c, ctx, res):
     return [A.ListFiles(target=target, extensions=exts, recursive=recursive)]
 
 
-_PARSERS = [_p_help, _p_workflow, _p_type_text, _p_inspect, _p_organize, _p_duplicates, _p_archive, _p_rename,
-            _p_transfer, _p_delete, _p_search, _p_open, _p_create_file, _p_create_folder, _p_list]
+# --------------------------------------------------------------------------- web, drafts, windows, tabs, screenshots
+_BROWSERS = {"chrome": "chrome", "google chrome": "chrome", "edge": "edge", "microsoft edge": "edge", "firefox": "firefox",
+             "mozilla firefox": "firefox"}
+_BROWSER_TAIL = re.compile(r"\s+(?:in|on|with|using|via)\s+(?:the\s+)?(?P<b>google chrome|chrome|microsoft edge|edge|"
+                           r"mozilla firefox|firefox)(?:\s+browser)?$", re.I)
+_ENGINE_ALIASES = {"web": "google", "the web": "google", "internet": "google", "the internet": "google",
+                   "online": "google", "google maps": "maps", "google images": "images", "google news": "news"}
+_ENGINES = r"google maps|google images|google news|google|youtube|bing|duckduckgo|wikipedia|amazon|github|maps|images|news|the web|web|the internet|internet|online"
+
+
+def _strip_browser(c: str) -> tuple[str, str]:
+    m = _BROWSER_TAIL.search(c)
+    return (_BROWSERS[m.group("b").lower()], c[:m.start()].strip()) if m else ("default", c)
+
+
+def _p_web(c, ctx, res):
+    browser, c2 = _strip_browser(c)
+    m = (re.match(rf"^(?:search|look up|lookup|find|google|check|play|watch)\s+(?:for\s+)?(?P<q>.+?)\s+(?:on|in|using|with|at)\s+"
+                  rf"(?P<e>{_ENGINES})$", c2, re.I)
+         or re.match(rf"^(?:search|look up|lookup|browse)\s+(?P<e>{_ENGINES})\s+for\s+(?P<q>.+)$", c2, re.I)
+         or re.match(r"^(?P<e>google|bing|youtube)\s+(?:for\s+)?(?P<q>.+)$", c2, re.I)
+         or re.match(r"^(?:search|look up|lookup|find)\s+(?:for\s+)?(?P<q>.+?)\s+(?P<e>online|on the (?:web|internet))$", c2, re.I))
+    if m:
+        engine = m.group("e").lower().replace("on the ", "")
+        engine = _ENGINE_ALIASES.get(engine, engine)
+        q = _unq(m.group("q"))
+        if not q:
+            raise NeedsClarification("What should I search for?", "generic")
+        return [A.OpenUrl(url=pc_control.search_url(q, engine), browser=browser)]
+    m = re.match(r"^(?:open|go to|goto|visit|browse to|browse|navigate to|load|launch|start|show me|take me to|bring up)\s+"
+                 r"(?:the\s+|my\s+)?(?P<t>.+?)(?P<w>\s+(?:website|web ?site|site|web ?page|page|homepage|home page))?$", c2, re.I)
+    if not m:
+        if browser != "default" and pc_control.normalize_url(c2):
+            return [A.OpenUrl(url=pc_control.normalize_url(c2), browser=browser)]
+        return None
+    target = _unq(m.group("t"))
+    url = pc_control.normalize_url(target)
+    if not url:
+        site = pc_control.SITES.get(target.lower())
+        if not site:
+            return None
+        desktop = _match_app(target, ctx.apps) or target.lower() in {p.lower() for p in ctx.programs}
+        if desktop and not m.group("w") and browser == "default":
+            return None  # 'open spotify' with Spotify installed -> the desktop app
+        url = site
+    res.notes.append("Websites open in your browser; the agent does not sign in, submit forms or post anything.")
+    return [A.OpenUrl(url=url, browser=browser)]
+
+
+_CHANNELS = {"gmail": "gmail", "outlook": "outlook", "whatsapp": "whatsapp", "email": "email", "e-mail": "email",
+             "mail": "email"}
+
+
+def _p_compose(c, ctx, res):
+    m = (re.match(r"^(?:draft|compose|write|prepare|create|make|start|open)\s+(?:up\s+)?(?:a\s+|an\s+|new\s+)*"
+                  r"(?P<ch>gmail|outlook|whatsapp|e-mail|email|mail)(?:\s+(?:email|e-mail|mail|message|msg|draft))?\b(?P<rest>.*)$",
+                  c, re.I)
+         or re.match(r"^(?:draft|compose|write|prepare)\s+(?:a\s+|an\s+)?(?:message|msg|text|note)\s+(?:on|via|in|using|through)\s+"
+                     r"(?P<ch>whatsapp|gmail|outlook|e-?mail)\b(?P<rest>.*)$", c, re.I))
+    if not m or re.search(r"\b(?:folders?|director(?:y|ies)|files?|zip)\b", m.group("rest") or "", re.I):
+        return None
+    channel = _CHANNELS[m.group("ch").lower().replace("e-mail", "email")]
+    rest = m.group("rest").strip()
+    body, bspan = _grab(r"(?:\bsaying|\bthat says|\bwith (?:the )?(?:text|message|body)|\bmessage|:)\s*:?\s*(?P<v>\"[^\"]*\"|'[^']*'|.+)$",
+                        rest)
+    work = _blank(rest, [bspan]) if bspan else rest
+    subject, sspan = _grab(r"\b(?:about|subject|titled|with (?:the )?subject|regarding|re)\s*:?\s+(?P<v>\"[^\"]+\"|'[^']+'|.+?)"
+                           r"(?=\s+to\s|\s*$)", work)
+    if sspan:
+        work = _blank(work, [sspan])
+    to = ""
+    tm = re.search(r"\bto\s+(?P<to>[^\s,;]+@[^\s,;]+(?:\s*[,;]\s*[^\s,;]+@[^\s,;]+)*|\+?\d[\d\s()-]{5,18}\d)", work)
+    if tm:
+        to = tm.group("to").strip()
+    else:
+        nm = re.search(r"\bto\s+(?P<n>(?!the\b|my\b)[A-Za-z][\w .'-]{0,40}?)\s*$", work.strip())
+        if nm:
+            res.assumptions.append(f"'{nm.group('n')}' is not an email address or phone number — pick the recipient "
+                                   "in the draft window.")
+    if not (body or subject):
+        raise NeedsClarification("What should the message say? e.g. 'draft an email to a@b.com about Lunch saying "
+                                 "See you at 1'.", "generic")
+    try:
+        return [A.ComposeMessage(channel=channel, to=to, subject=subject or "", body=body or "")]
+    except ValidationError as exc:
+        raise NeedsClarification(f"That draft can't be prepared: {exc.errors()[0]['msg'].removeprefix('Value error, ')}",
+                                 "generic")
+
+
+_TAB_BROWSER = r"(?:\s+(?:in|on)\s+(?P<b>google chrome|chrome|microsoft edge|edge|firefox))?"
+
+
+def _p_tab(c, ctx, res):
+    pats = [(rf"^(?:open\s+)?(?:a\s+)?new\s+(?:browser\s+)?tab{_TAB_BROWSER}$", "new"),
+            (rf"^close\s+(?:the\s+|this\s+|current\s+|that\s+)*(?:browser\s+)?tab{_TAB_BROWSER}$", "close"),
+            (rf"^(?:reload|refresh)\s+(?:the\s+|this\s+|current\s+)*(?:browser\s+)?(?:tab|page){_TAB_BROWSER}$", "reload"),
+            (rf"^(?:go\s+to\s+|switch\s+to\s+)?(?:the\s+)?next\s+(?:browser\s+)?tab{_TAB_BROWSER}$", "next"),
+            (rf"^(?:go\s+to\s+|switch\s+to\s+)?(?:the\s+)?(?:previous|prev|last)\s+(?:browser\s+)?tab{_TAB_BROWSER}$",
+             "previous")]
+    for pat, op in pats:
+        m = re.match(pat, c, re.I)
+        if m:
+            b = _BROWSERS.get((m.group("b") or "").lower(), "any")
+            return [A.BrowserTab(op=op, browser=b)]
+    return None
+
+
+_WIN_OPS = {"minimize": "minimize", "minimise": "minimize", "maximize": "maximize", "maximise": "maximize",
+            "restore": "restore", "close": "close", "switch to": "focus", "focus": "focus", "focus on": "focus",
+            "activate": "focus", "bring up": "focus", "go to": "focus", "show": "focus", "unminimize": "restore"}
+
+
+def _p_windows(c, ctx, res):
+    if re.match(r"^(?:list|show|display|what are|which|what)(?:\s+(?:are|me))?(?:\s+(?:all|the|my|currently))*\s+"
+                r"(?:open|opened|running)?\s*(?:windows|apps|programs)(?:\s+(?:are\s+)?(?:open|running|opened))?$|"
+                r"^what'?s open(?:\s+on\s+(?:my\s+)?(?:pc|screen|computer|desktop))?$", c, re.I):
+        return [A.ListWindows()]
+    m = re.match(r"^(?P<op>minimi[sz]e|maximi[sz]e|unminimize|restore|close|switch to|focus on|focus|activate|bring up|"
+                 r"go to|show)\s+(?:the\s+|my\s+)?(?P<w>.+?)(?P<win>\s+(?:window|app|browser))?$", c, re.I)
+    if not m:
+        return None
+    op = _WIN_OPS[m.group("op").lower()]
+    w = _unq(m.group("w"))
+    if m.group("op").lower() in {"go to", "show", "bring up"} and not m.group("win"):
+        return None  # 'show/go to X' without 'window' is a list/open command
+    tok = _FILE_TOKEN.search(w)
+    if m.group("op").lower() == "close" and ((tok and tok.group(0).rsplit(".", 1)[-1].lower() in KNOWN_EXTS
+                                              and not pc_control.normalize_url(tok.group(0)))
+                                             or w.lower() in {"it", "that", "this"}):
+        return None
+    if w.lower() in {"all", "all windows", "everything", "every window"}:
+        raise NeedsClarification("Name one window, e.g. 'minimize Chrome' or 'close the Notepad window'.", "generic")
+    return [A.WindowControl(op=op, window=w)]
+
+
+def _p_screenshot(c, ctx, res):
+    if not re.search(r"\b(?:screen ?shot|screen ?capture|capture (?:the |my |a )?screen|print ?screen|"
+                     r"snapshot of (?:the |my )?screen|screen ?grab)\b", c, re.I):
+        return None
+    locs = _locations(c, {"in", "into", "to", "inside", "under"})
+    folder = _resolve_location(locs[0].phrase, ctx) if locs else _default_location(ctx, res, "for the screenshot")
+    return [A.TakeScreenshot(destination=folder)]
+
+
+# --------------------------------------------------------------------------- typo-tolerant verbs
+_VERBS = ["open", "launch", "start", "list", "show", "copy", "move", "rename", "delete", "remove", "create", "make",
+          "find", "search", "compress", "organize", "organise", "type", "write", "inspect", "close", "minimize",
+          "maximize", "restore", "switch", "google", "draft", "compose", "take", "undo", "browse", "visit", "focus",
+          "duplicate", "display", "archive", "refresh", "reload"]
+_KNOWN_FIRST = set(_VERBS) | {
+    "what", "which", "where", "how", "help", "zip", "sort", "view", "see", "check", "preview", "run", "execute", "fire",
+    "bring", "load", "save", "add", "build", "prepare", "set", "put", "place", "send", "forward", "email", "mail",
+    "navigate", "go", "lock", "tell", "clear", "read", "capture", "new", "next", "previous", "last", "minimise",
+    "maximise", "play", "watch", "look", "lookup", "bing", "youtube", "activate", "unminimize", "inventory", "group",
+    "tidy", "clean", "back", "store", "hey", "please", "kindly", "just", "then", "also", "and", "now", "show",
+    "screenshot", "print", "snapshot", "files", "folders", "everything", "all"}
+
+
+def _fix_verb(clause: str, ctx: ParseContext) -> str:
+    m = re.match(r"^([A-Za-z]{4,})\b", clause)
+    if not m or m.group(1).lower() in _KNOWN_FIRST:
+        return clause
+    close = difflib.get_close_matches(m.group(1).lower(), _VERBS, n=1, cutoff=0.74)
+    if not close:
+        return clause
+    ctx.fixes.append(f"Read '{m.group(1)}' as '{close[0]}'.")
+    return close[0] + clause[m.end():]
+
+
+_PARSERS = [_p_help, _p_workflow, _p_compose, _p_tab, _p_screenshot, _p_type_text, _p_inspect, _p_windows, _p_web,
+            _p_organize, _p_duplicates, _p_archive, _p_rename, _p_transfer, _p_delete, _p_search, _p_open,
+            _p_create_file, _p_create_folder, _p_list]
 
 
 def _protect_quotes(text: str) -> tuple[str, dict[str, str]]:
@@ -691,6 +903,7 @@ def _restore(text: str, mapping: dict[str, str]) -> str:
 
 def parse(text: str, ctx: ParseContext) -> ParseResult:
     res = ParseResult()
+    ctx.fixes = []
     t = (text or "").replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'").strip()
     protected, mapping = _protect_quotes(t)
     if _PREVIEW.search(protected):
@@ -706,6 +919,7 @@ def parse(text: str, ctx: ParseContext) -> ParseResult:
             clause = re.sub(r"\s+", " ", clause)
             if not clause:
                 continue
+            clause = _fix_verb(clause, ctx)
             for parser in _PARSERS:
                 out = parser(clause, ctx, res)
                 if out is not None:
@@ -716,6 +930,7 @@ def parse(text: str, ctx: ParseContext) -> ParseResult:
     except NeedsClarification as q:
         res.items = []
         res.clarification, res.clarification_kind = q.question, q.kind
+    res.assumptions = ctx.fixes + res.assumptions
     if not res.items and not res.clarification and not res.help:
         res.clarification, res.clarification_kind = UNKNOWN_MSG, "generic"
     return res

@@ -154,6 +154,8 @@ class VoiceAssistant:
                          r"(?: process(?:es)?| app| program| task)? (.+?)(?: process(?:es)?| app| program| task)?", t)
         if not m or t.startswith(("stop the run", "stop everything")):
             return None
+        if not re.match(r"(?:kill|terminate|end|force)\b", t) and not re.search(r"\b(?:process|processes|task)\b", t):
+            return None  # plain 'close X' goes to the agent, which closes the window politely
         name = m.group(1).strip()
         procs = self.sys.find(name) if name and len(name) > 1 else []
         if not procs:

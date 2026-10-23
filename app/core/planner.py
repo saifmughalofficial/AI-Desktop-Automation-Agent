@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from app.actions import pc_control
 from app.actions.filesystem import CATEGORIES, category_for
 from app.config.settings import Settings
 from app.core import action_schema as A
@@ -97,6 +98,46 @@ def describe(action) -> dict:
                     expected="The text appears at the end of the document.",
                     verification="Read the editor control back and confirm the text is present.",
                     consequence="Adds text to the window's unsaved document (nothing is saved to disk).")
+    if n == "open_url":
+        return dict(description=f"Open {action.url}" + ("" if action.browser == "default" else f" in {action.browser.title()}"),
+                    expected="The page opens in a browser tab.",
+                    verification="The browser accepts the request (page loading is not verified).",
+                    consequence="Opens a web page; nothing is downloaded, submitted or sent.")
+    if n == "compose_message":
+        label = {"email": "email", "gmail": "Gmail", "outlook": "Outlook", "whatsapp": "WhatsApp"}[action.channel]
+        preview = action.body if len(action.body) <= 50 else action.body[:47] + "…"
+        art = "an" if label[0].lower() in "aeiou" else "a"
+        return dict(description=f"Open {art} {label} draft" + (f" to {action.to}" if action.to else "") + f": “{preview}”",
+                    expected="A compose window opens with the text filled in.",
+                    verification="The draft link is handed to the browser / mail app.",
+                    consequence="Nothing is sent — you review the draft and press Send yourself.")
+    if n == "launch_program":
+        return dict(description=f"Start installed program {action.name}",
+                    expected=f"A {action.name} window opens.",
+                    verification="Wait for a new top-level window to appear.",
+                    consequence="Starts a program from your Start menu.")
+    if n == "list_windows":
+        return dict(description="List the open windows" + (f" matching '{action.filter}'" if action.filter else ""),
+                    expected="A table of window titles and their programs.",
+                    verification="Windows enumerated through UI Automation.",
+                    consequence="Read-only.")
+    if n == "window_control":
+        return dict(description=f"{action.op.title()} the “{action.window}” window",
+                    expected=f"The window is {'closed' if action.op == 'close' else action.op + 'd'}.",
+                    verification="Window state is read back after the change.",
+                    consequence="Closing asks the app politely; it may prompt to save." if action.op == "close"
+                    else "Only the window layout changes.")
+    if n == "browser_tab":
+        return dict(description=f"Browser: {action.op} tab" + ("" if action.browser == "any" else f" ({action.browser.title()})"),
+                    expected="The browser performs the tab action.",
+                    verification="The browser window title is read back.",
+                    consequence="Closing a tab discards that page's unsaved form input." if action.op == "close"
+                    else "Only browser tabs change.")
+    if n == "take_screenshot":
+        return dict(description=f"Take a screenshot into {action.destination.display()}",
+                    expected="A new PNG image of the screen.",
+                    verification="The PNG file exists and has image data.",
+                    consequence="Saves an image of everything visible on screen (Undo quarantines it).")
     return dict(description=n, expected="", verification="", consequence="")
 
 
@@ -127,7 +168,8 @@ class Planner:
 
         index = WorkspaceIndex(self.perms)
         ctx = rules.ParseContext(index=index, apps=self.perms.apps, workflows=self.settings.workflows,
-                                 selection=list(selection or []), current=current)
+                                 selection=list(selection or []), current=current,
+                                 programs=pc_control.program_names() if self.policy.desktop_available else [])
         result, engine = self._parse(text, ctx, plan)
         plan.engine = engine
         plan.assumptions += result.assumptions
@@ -284,7 +326,9 @@ class Planner:
                   "copy_file": "copy", "move_file": "move", "rename_file": "rename", "delete_file": "delete",
                   "write_text_file": "create file", "archive_folder": "zip", "launch_app": "launch app",
                   "open_file": "open file", "open_folder": "open folder", "inspect_ui": "inspect UI",
-                  "type_text": "type text"}
+                  "type_text": "type text", "open_url": "open web page", "compose_message": "message draft",
+                  "launch_program": "start program", "list_windows": "list windows", "window_control": "window",
+                  "browser_tab": "browser tab", "take_screenshot": "screenshot"}
         parts = [f"{n}× {labels.get(k, k)}" for k, n in kinds.items()]
         plan.summary = f"{len(plan.steps)} action(s): " + ", ".join(parts)
         if plan.dry_run:
@@ -292,6 +336,8 @@ class Planner:
         roots = sorted({t.split('/')[0] for s in plan.steps for t in s.targets if "/" in t})
         if roots:
             plan.preconditions.append(f"All file targets stay inside approved folder(s): {', '.join(roots)}.")
+        if any(s.action.action == "compose_message" for s in plan.steps):
+            plan.preconditions.append("Drafts are only opened for you — the agent never sends messages.")
         if any(s.action.action in {"launch_app", "type_text", "inspect_ui"} for s in plan.steps):
             plan.preconditions.append("Applications must be on the allowlist; the agent runs visibly on your desktop.")
         if any(s.action.action in {"copy_file", "move_file", "rename_file", "write_text_file", "archive_folder"}

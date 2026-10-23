@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from app.actions import app_launcher, filesystem as fs, ui_automation
+from app.actions import app_launcher, filesystem as fs, pc_control, ui_automation
 from app.config.settings import Settings
 from app.core import action_schema as A
 from app.core.action_schema import PathRef, StepStatus
@@ -330,11 +330,118 @@ def _type_text(a: A.TypeText, ctx: ExecContext) -> ActionResult:
     return _ok(f"{app.name}: {msg}", verified=verified)
 
 
+# --------------------------------------------------------------------------- web, programs, windows
+def _open_url(a: A.OpenUrl, ctx: ExecContext) -> ActionResult:
+    if ctx.dry_run:
+        return _sim(f"Would open {a.url}" + ("" if a.browser == "default" else f" in {a.browser.title()}") + ".")
+    if ctx.virtual is not None:
+        win = ctx.virtual.open_link(a.url, a.url)
+        return _ok(f"Ready in the web virtual desktop: click the link in “{win['title']}” to open {a.url}.")
+    ok, msg = pc_control.open_url(a.url, a.browser)
+    return _ok(msg, verified=False) if ok else _fail(msg)
+
+
+def _compose_message(a: A.ComposeMessage, ctx: ExecContext) -> ActionResult:
+    url = pc_control.compose_url(a.channel, a.to, a.subject, a.body)
+    label = {"email": "email app", "gmail": "Gmail", "outlook": "Outlook", "whatsapp": "WhatsApp"}[a.channel]
+    if ctx.dry_run:
+        return _sim(f"Would open a pre-filled {label} draft ({len(a.body)} characters). Nothing is sent.")
+    if ctx.virtual is not None:
+        win = ctx.virtual.open_link(f"Draft — {label}", url, draft={"to": a.to, "subject": a.subject, "body": a.body})
+        return _ok(f"Draft ready in “{win['title']}”: open it, review, and press Send yourself (the agent never sends).")
+    ok, msg = pc_control.open_url(url) if a.channel != "email" else (app_launcher.open_mailto(url))
+    return (_ok(f"Opened a pre-filled {label} draft — review it and press Send yourself. Nothing was sent.",
+                verified=False) if ok else _fail(msg))
+
+
+def _launch_program(a: A.LaunchProgram, ctx: ExecContext) -> ActionResult:
+    if a.name not in pc_control.program_index():
+        return _fail(f"{a.name} is not an installed Start-menu program.")
+    if ctx.dry_run:
+        return _sim(f"Would start {a.name}.")
+    ok, verified, msg = pc_control.launch_program(a.name, ctx.settings.execution.verify_launch_timeout_s + 2)
+    return _ok(msg, verified=verified) if ok else _fail(msg)
+
+
+def _list_windows(a: A.ListWindows, ctx: ExecContext) -> ActionResult:
+    if ctx.virtual is not None:
+        rows = [{"title": w["title"], "process": "web window", "state": "open", "handle": w["id"]}
+                for w in ctx.virtual.windows.values() if a.filter.lower() in w["title"].lower()]
+    else:
+        ok, why = ui_automation.available()
+        if not ok:
+            return _fail(why)
+        rows = pc_control.list_windows(a.filter)
+    return _ok(f"{len(rows)} open window(s)" + (f" matching '{a.filter}'" if a.filter else "") + ".",
+               details={"rows": rows})
+
+
+def _window_control(a: A.WindowControl, ctx: ExecContext) -> ActionResult:
+    if ctx.virtual is not None:
+        win = ctx.virtual.find(a.window)
+        if not win:
+            return _fail(f"No web window matches “{a.window}”.")
+        if ctx.dry_run:
+            return _sim(f"Would {a.op} “{win['title']}”.")
+        if a.op == "close":
+            ctx.virtual.close(win["id"])
+            return _ok(f"Closed the web window “{win['title']}”.", verified=ctx.virtual.get(win["id"]) is None)
+        return _ok(f"“{win['title']}” is shown in the web virtual desktop ({a.op} applies to real windows only).")
+    ok, why = ui_automation.available()
+    if not ok:
+        return _fail(why)
+    win, others = pc_control.find_window(a.window)
+    if win is None:
+        return _fail(f"No open window matches “{a.window}”." + (f" Open windows: {'; '.join(others)}." if others else ""))
+    if ctx.dry_run:
+        return _sim(f"Would {a.op} “{win.window_text()[:60]}”.")
+    try:
+        verified, msg = pc_control.window_op(win, a.op)
+    except Exception as exc:  # UI automation is fragile: report honestly
+        return _fail(f"Could not {a.op} the window: {exc.__class__.__name__}: {exc}")
+    return _ok(msg, verified=verified)
+
+
+def _browser_tab(a: A.BrowserTab, ctx: ExecContext) -> ActionResult:
+    ok, why = ui_automation.available()
+    if not ok:
+        return _fail(why)
+    if ctx.dry_run:
+        return _sim(f"Would send '{a.op} tab' to the {a.browser} browser.")
+    try:
+        ok, msg = pc_control.browser_tab(a.op, a.browser)
+    except Exception as exc:
+        return _fail(f"Browser tab control failed: {exc.__class__.__name__}: {exc}")
+    return _ok(msg, verified=False) if ok else _fail(msg)
+
+
+def _take_screenshot(a: A.TakeScreenshot, ctx: ExecContext) -> ActionResult:
+    from datetime import datetime
+    folder = ctx.perms.resolve(a.destination, write=True)
+    if not folder.is_dir():
+        return _fail(f"{a.destination.display()} is not an existing folder.")
+    dest = fs.unique_path(folder / f"screenshot_{datetime.now():%Y%m%d_%H%M%S}.png")
+    ref = ctx.perms.to_ref(dest)
+    if ctx.dry_run:
+        return _sim(f"Would save a screenshot as {ref.display()}.")
+    try:
+        ok, msg = pc_control.screenshot(dest)
+    except Exception as exc:
+        return _fail(f"Screenshot failed: {exc}")
+    if not ok:
+        return _fail("The screenshot file could not be verified.")
+    return _ok(f"{msg} → {ref.display()}", details={"image": str(dest)},
+               undo=[{"op": "quarantine_created", "target": ref.model_dump(), "sha256": fs.sha256_file(dest)}])
+
+
 HANDLERS: dict[str, Callable[..., ActionResult]] = {
     "list_files": _list_files, "find_duplicates": _find_duplicates, "create_folder": _create_folder,
     "copy_file": _copy_file, "move_file": _move_file, "rename_file": _rename_file, "delete_file": _delete_file,
     "write_text_file": _write_text_file, "archive_folder": _archive_folder, "launch_app": _launch_app,
     "open_file": _open_file, "open_folder": _open_folder, "inspect_ui": _inspect_ui, "type_text": _type_text,
+    "open_url": _open_url, "compose_message": _compose_message, "launch_program": _launch_program,
+    "list_windows": _list_windows, "window_control": _window_control, "browser_tab": _browser_tab,
+    "take_screenshot": _take_screenshot,
 }
 assert set(HANDLERS) == set(A.ACTION_NAMES), "every schema action needs exactly one handler"
 

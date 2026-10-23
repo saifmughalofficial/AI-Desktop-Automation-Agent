@@ -98,3 +98,17 @@ def open_folder(path: Path, timeout: float = 4.0) -> LaunchResult:
         return LaunchResult(True, True, f"Explorer opened {path.name}; window detected.", handle=handle)
     return LaunchResult(True, False, f"Asked Explorer to open {path.name}; its window could not be verified "
                                      "(Explorer may have reused an existing window).")
+
+
+def open_mailto(url: str) -> tuple[bool, str]:
+    """Open a mailto: draft in the default mail app (Windows), else the default browser."""
+    if not url.startswith("mailto:"):
+        return False, "Not a mailto: link."
+    try:
+        if hasattr(os, "startfile"):
+            os.startfile(url)  # noqa: S606 - a mailto: URL built by compose_url, never a path
+            return True, "Opened the default mail app."
+        import webbrowser
+        return webbrowser.open(url), "Opened the default mail handler."
+    except OSError as exc:
+        return False, f"No email app is set up on this PC ({exc}). Try 'draft a Gmail' or 'draft an Outlook email'."

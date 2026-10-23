@@ -143,6 +143,13 @@ Allowed STEP shapes (no other keys, no other actions):
 {"action":"open_folder","target":FOLDER_PATH}
 {"action":"inspect_ui","app":"Notepad"}
 {"action":"type_text","app":"Notepad","text":"..."}   (always put launch_app for that app first)
+{"action":"open_url","url":"https://...","browser":"default"}   (browser: default|chrome|edge|firefox)
+{"action":"compose_message","channel":"gmail","to":"a@b.com","subject":"...","body":"..."}   (opens a draft; never sends)
+{"action":"launch_program","name":"Start-menu program name"}
+{"action":"list_windows","filter":""}
+{"action":"window_control","op":"minimize","window":"Chrome"}   (op: focus|minimize|maximize|restore|close)
+{"action":"browser_tab","op":"new","browser":"any"}   (op: new|close|next|previous|reload)
+{"action":"take_screenshot","destination":FOLDER_PATH}
 {"macro":"organize_by_type","target":FOLDER_PATH}
 {"macro":"bulk_rename","target":FOLDER_PATH,"extensions":["jpg"],"prefix":"Event_","suffix":"","base_name":null}
 {"macro":"bulk_transfer","operation":"copy","source":FOLDER_PATH,"extensions":["pdf"],"destination":FOLDER_PATH}

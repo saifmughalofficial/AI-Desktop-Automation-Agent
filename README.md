@@ -76,3 +76,14 @@ License: MIT (see LICENSE for third-party licenses).
   offline speech replies (Windows SAPI / bundled **espeak-ng**). 21 languages selectable, including **Urdu**
   (Urdu script + Roman Urdu), Hindi, Arabic, Persian, Turkish, French, Spanish, German, Chinese, Russian and more.
 - Voice never executes directly: risky requests open a confirmation; agent tasks go through plan → policy → approval.
+
+## Whole-PC control & better accuracy (v1.3)
+
+- **Web:** `open youtube.com`, `open github.com in Chrome`, `search YouTube for lofi`, `google weather in Lahore`.
+- **Message drafts:** `draft a Gmail to a@b.com about Lunch saying See you at 1`, `draft a WhatsApp message to +92… saying hi`
+  open a pre-filled compose window — **you** review and press Send. The agent never signs in, types passwords or sends.
+- **Programs & windows:** start any installed Start-menu program (`open vs code`), `list open windows`,
+  `minimize/maximize/restore/switch to/close <window>`, browser tabs (`new tab`, `close this tab`, `next tab`, `reload`),
+  `take a screenshot`.
+- **Accuracy:** typo-tolerant verbs, fuzzy app/program/folder matching with visible assumptions, and "did you mean …?"
+  suggestions for files.

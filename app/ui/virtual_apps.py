@@ -107,6 +107,16 @@ def render_virtual_desktop() -> None:
                     st.iframe(PAINT, height=330)
                 elif kind == "character map":
                     st.iframe(CHARMAP, height=300)
+                elif kind == "link":
+                    d = win.get("draft") or {}
+                    if d:
+                        st.markdown(f"**To:** {esc(d.get('to') or '— choose in the app —')}  \n"
+                                    f"**Subject:** {esc(d.get('subject') or '—')}")
+                        st.text_area("Draft", d.get("body", ""), height=120, disabled=True, label_visibility="collapsed",
+                                     key=f"vd_draft_{win['id']}")
+                        st.caption("Review the draft, then press Send yourself — the agent never sends.")
+                    st.link_button("Open " + ("draft" if d else win["url"][:60]), win["url"], type="primary",
+                                   icon=":material/open_in_new:", width="stretch")
                 elif kind == "image":
                     st.image(win["path"], width="stretch")
                 elif kind == "explorer":
