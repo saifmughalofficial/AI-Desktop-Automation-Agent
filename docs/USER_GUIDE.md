@@ -1,6 +1,6 @@
 # AI Desktop Automation Agent — User & Instruction Manual
 
-Version 1.3.0. The PDF version is `docs/User_Manual.pdf`.
+Version 1.4.0. The PDF version is `docs/User_Manual.pdf`.
 
 ## 1. What the agent does
 
@@ -199,7 +199,9 @@ Voice Assistant (sidebar → Voice) lets you speak or type commands. Pick the as
 - Urdu: speech uses the Hindustani model and is shown in Urdu script. You can also type Urdu or Roman Urdu, e.g. “awaz barhao”, “battery kitni hai”, “system ki halat”.
 - Examples: system status · CPU usage · top processes · battery · disk space · volume up · mute · open display settings · close Notepad process · lock the screen · go to history · what time is it.
 - Anything else (e.g. “open Notepad”, “organize my Downloads by type”) is sent to the agent, which shows the plan in the Command Center for your normal review and approval.
-- Voice never executes anything directly: risky actions open a confirmation dialog, and speech text is only matched against keyword tables.
+- Hands-free mode (local PC, on by default): the agent listens to your microphone all the time, offline. Just say “open Notepad”, “search YouTube for lofi”, “minimize Chrome” — no clicks, no Enter. LOW-risk commands run at once; MEDIUM-risk ones are read back and run when you say “yes”; HIGH-risk ones (deletes, shutdown) always need a click on screen. Say “stop” any time. A live indicator in the sidebar shows what it hears; turn it off on the Voice page.
+- Accuracy: the high-accuracy English model (124 MB) is used when downloaded; the recogniser checks up to five alternatives and picks the one that is a valid command, and fixes common slips (“note pad” → notepad, “you tube” → YouTube). Background chatter that isn't a command is ignored.
+- Risk is always decided by the policy engine, never by the voice layer.
 
 ## 20. Browser, drafts, programs and windows
 

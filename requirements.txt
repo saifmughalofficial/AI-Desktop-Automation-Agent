@@ -6,3 +6,4 @@ pandas>=2.0
 pywinauto>=0.6.8; sys_platform == "win32"
 vosk>=0.3.45
 espeakng-loader>=0.2
+sounddevice>=0.4; sys_platform == "win32"

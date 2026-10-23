@@ -9,7 +9,7 @@ import streamlit as st
 
 from app import __version__
 from app.ui import (automation_page, explorer_page, history_page, main_window, manual_page, settings_dialog, state,
-                    system_page, voice_page)
+                    system_page, voice_hud, voice_page)
 from app.ui.components import icon
 from app.ui.theme import CSS, FX_CSS, PALETTES, STATIC_CSS, fx_script
 
@@ -45,6 +45,7 @@ def sidebar() -> None:
                 ("Allowlisted apps", len(s.settings.apps)), ("Tasks recorded", stats["tasks"]),
                 ("Selection", f"{len(state.selection())} file(s)")]
         st.html("".join(f"<div class='side-stat'><span>{k}</span><b>{v}</b></div>" for k, v in rows))
+        voice_hud.sidebar_indicator()
         st.caption("Offline-capable · no paid APIs · every action policy-checked")
 
 
@@ -62,6 +63,7 @@ st.session_state.pages = pages
 nav = st.navigation({"Agent": [pages["command"], pages["files"], pages["apps"]],
                      "System": [pages["system"], pages["voice"]],
                      "Records & setup": [pages["history"], pages["settings"], pages["manual"]]})
+voice_hud.ensure()
 sidebar()
 nav.run()
 voice_page.play_pending()

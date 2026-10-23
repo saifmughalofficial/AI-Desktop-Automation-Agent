@@ -13,6 +13,7 @@ from app.ui import state
 from app.ui.system_page import _sys, confirm_dialog
 from app.voice import i18n, stt, tts
 from app.voice.assistant import HELP, VoiceAssistant
+from app.ui import voice_hud
 
 ORB = """<div class="v-orb-wrap{cls}"><div class="v-orb"><i></i><i></i><i></i>
 <svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/></svg></div>
@@ -23,7 +24,17 @@ QUICK = ["System status", "Top processes", "Battery", "Disk space", "Volume up",
 
 
 def _lang() -> str:
-    return st.session_state.get("voice_lang", "en")
+    if "voice_lang" not in st.session_state:
+        s = state.svc()
+        st.session_state.voice_lang = "en" if s.hosted else s.settings.voice_lang
+    return st.session_state.voice_lang
+
+
+def _lang_changed() -> None:
+    s = state.svc()
+    if not s.hosted and st.session_state.voice_lang != s.settings.voice_lang:
+        on = s.settings.voice_handsfree
+        voice_hud.set_handsfree(on, st.session_state.voice_lang)
 
 
 def log() -> list[dict]:
@@ -96,6 +107,8 @@ def _model_box() -> bool:
         try:
             stt.download_model(s.voice_dir, lambda f: bar.progress(min(f, 1.0), f"Downloading… {f * 100:.0f}%"), lang)
             st.success("Speech model installed.")
+            if not s.hosted and s.settings.voice_handsfree:
+                voice_hud.set_handsfree(True, lang)
             st.rerun()
         except Exception as exc:  # network errors etc.
             st.error(f"Download failed: {exc}")
@@ -104,7 +117,7 @@ def _model_box() -> bool:
 
 def _orb(active: bool) -> str:
     bars = "".join(f"<i style='animation-delay:{i * .07:.2f}s'></i>" for i in range(24))
-    cap = "Processing…" if active else "Press the mic, speak, then stop the recording"
+    cap = "Processing…" if active else "Hands-free: just speak · or record a clip below"
     return C._clean(ORB.format(cls=" on" if active else "", bars=bars, cap=cap))
 
 
@@ -116,11 +129,13 @@ def render() -> None:
         st.switch_page(st.session_state.pages[nav])
     if op := st.session_state.pop("voice_confirm", None):
         confirm_dialog(op)
+    voice_hud.page_section()
 
     left, right = st.columns([1, 1.25], gap="large")
     with left:
         codes = list(i18n.LANGS)
-        st.selectbox("Assistant language", codes, key="voice_lang", index=0,
+        _lang()
+        st.selectbox("Assistant language", codes, key="voice_lang", on_change=_lang_changed,
                      format_func=lambda c: f"{i18n.LANGS[c]['name']} · {i18n.LANGS[c]['native']}"
                      + ("" if i18n.full_support(c) else "  (speech only, English replies)"))
         lang = _lang()

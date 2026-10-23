@@ -7,7 +7,9 @@ import re
 
 # code: name, Vosk model, approx MB, espeak-ng voice, full (keywords + replies) support, right-to-left
 LANGS: dict[str, dict] = {
-    "en": dict(name="English (US)", native="English", model="vosk-model-small-en-us-0.15", mb=39, voice="en-us"),
+    "en-hq": dict(name="English (US) — high accuracy", native="English", model="vosk-model-en-us-0.22-lgraph", mb=124,
+                  voice="en-us"),
+    "en": dict(name="English (US) — small/fast", native="English", model="vosk-model-small-en-us-0.15", mb=39, voice="en-us"),
     "en-in": dict(name="English (India/Pakistan)", native="English", model="vosk-model-small-en-in-0.4", mb=35, voice="en"),
     "ur": dict(name="Urdu", native="اردو", model="vosk-model-small-hi-0.22", mb=42, voice="ur", rtl=True),
     "hi": dict(name="Hindi", native="हिन्दी", model="vosk-model-small-hi-0.22", mb=42, voice="hi"),

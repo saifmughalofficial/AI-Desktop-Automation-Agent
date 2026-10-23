@@ -84,6 +84,10 @@ class Settings(BaseModel):
     theme: Literal["dual", "blue"] = "dual"
     background_fx: bool = True
     web_browser: Literal["chrome", "edge", "firefox", "default"] = "chrome"  # used when a command names no browser
+    voice_handsfree: bool = True  # always-on microphone listening (local PC only)
+    voice_lang: str = "en-hq"  # speech language for hands-free mode (see app.voice.i18n.LANGS)
+    voice_speak: bool = True  # speak replies through the PC speakers
+    voice_confirm_by_voice: bool = True  # allow a spoken "yes" to approve MEDIUM-risk plans (HIGH always needs a click)
 
     def root_aliases(self) -> list[str]:
         return [r.alias for r in self.approved_roots]

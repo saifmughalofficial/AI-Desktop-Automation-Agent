@@ -222,6 +222,14 @@ background:rgba(8,30,64,.5);border:1px solid rgba(56,189,248,.12);transition:all
 @keyframes vPulse{50%{transform:scale(1.05);box-shadow:0 0 60px rgba(56,189,248,.5),0 0 90px rgba(255,45,85,.25) inset}}
 @keyframes vRing{0%{transform:scale(.9) rotate(0);opacity:.9}100%{transform:scale(1.25) rotate(360deg);opacity:0}}
 @keyframes vBar{0%,100%{height:6px}50%{height:30px}}
+.v-side{margin:8px 0 6px;padding:9px 11px;border-radius:12px;border:1px solid rgba(56,189,248,.45);background:linear-gradient(135deg,rgba(14,40,90,.65),rgba(80,12,40,.45));box-shadow:0 0 18px rgba(56,189,248,.18)}
+.v-side-h{font-family:Rajdhani;font-weight:700;font-size:.86rem;color:#e6f6ff;display:flex;align-items:center;gap:7px}
+.v-dot{width:9px;height:9px;border-radius:50%;background:#34d399;box-shadow:0 0 10px #34d399;animation:vDot 1.2s ease-in-out infinite}
+.v-side.thinking .v-dot,.v-side.waiting_yes .v-dot{background:#fbbf24;box-shadow:0 0 10px #fbbf24}
+.v-side.speaking .v-dot{background:#a855f7;box-shadow:0 0 10px #a855f7}.v-side.error .v-dot{background:#f87171}
+.v-meter{display:flex;align-items:flex-end;gap:2px;height:24px;margin:6px 0 2px}.v-meter i{flex:1;border-radius:2px;background:linear-gradient(#38bdf8,#ff2d55);transition:height .15s}.v-meter.big{height:34px;margin-bottom:8px}
+.v-heard{font-size:.78rem;color:#9cc8e6;min-height:1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@keyframes vDot{50%{transform:scale(1.35);opacity:.6}}
 .manual h2{margin-top:1.4rem!important}
 .manual table{width:100%;border-collapse:collapse;font-size:.9rem}.manual td,.manual th{border:1px solid rgba(56,189,248,.18);padding:6px 9px}
 .manual th{background:rgba(14,116,144,.25);font-family:'Rajdhani';letter-spacing:.06em}
