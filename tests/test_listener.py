@@ -35,22 +35,38 @@ def test_picks_the_alternative_that_is_a_valid_command(lis):
     assert lis.current_run and lis.current_run.status == "completed"
 
 
+def _instant(svc, on):
+    new = svc.settings.model_copy(deep=True)
+    new.voice_instant = on
+    svc.apply_settings(new, save=False)
+
+
+def test_instant_mode_runs_medium_risk_immediately(lis, svc):
+    lis.handle(["create a text file named quick in Projects with text 'hi'"])
+    assert lis.pending is None and lis.current_run.status == "completed"
+
+
 def test_medium_risk_waits_for_spoken_yes(lis, svc):
+    _instant(svc, False)
     lis.handle(["create a text file named todo in Projects with text 'hi'"])
-    assert lis.pending and lis.current_run is None and "yes or no" in said(lis)[-1]
+    assert lis.pending and lis.current_run is None and "say yes" in said(lis)[-1].lower()
     lis.handle(["yes"])
     assert lis.pending is None and lis.current_run.status == "completed"
 
 
-def test_medium_risk_cancelled_by_no(lis):
+def test_medium_risk_cancelled_by_no(lis, svc):
+    _instant(svc, False)
     lis.handle(["create a text file named todo2 in Projects with text 'hi'"])
     lis.handle(["no"])
     assert lis.pending is None and lis.current_run is None
 
 
-def test_high_risk_never_runs_by_voice(lis):
+def test_high_risk_needs_spoken_yes_then_runs_without_clicks(lis, svc):
     lis.handle(["delete notes.txt in Downloads"])
-    assert lis.current_run is None and lis.pending is None and "on screen" in said(lis)[-1]
+    assert lis.current_run is None and lis.pending and "say yes" in said(lis)[-1].lower()
+    lis.handle(["yes"])
+    assert lis.current_run.status == "completed"  # JIT pause auto-confirmed by the spoken yes
+    assert not (svc.workspace / "Downloads" / "notes.txt").exists()  # quarantined (undoable), not erased
 
 
 def test_background_chatter_is_ignored_silently(lis):

@@ -119,6 +119,7 @@ class VoiceListener:
         self.pending = None  # (plan, deadline) awaiting a spoken yes/no
         self.current_run = None
         self.nav_request: str | None = None
+        self.on_say = None  # callable(text) -> None to deliver replies elsewhere (browser engine)
         self._stop = threading.Event()
         self._mic: queue.Queue = queue.Queue(maxsize=200)
         self._jobs: queue.Queue = queue.Queue()
@@ -165,6 +166,9 @@ class VoiceListener:
 
     def speak(self, text: str) -> None:
         self._say_log("agent", text)
+        if self.on_say is not None:  # browser engine: the page speaks the reply
+            self.on_say(text)
+            return
         settings = self.svc.settings if self.svc else None
         if settings is not None and not settings.voice_speak:
             return
@@ -381,6 +385,11 @@ class VoiceListener:
                 self._say_log("you", top)
                 if plan == "undo":
                     self.speak(self.svc.orchestrator.undo_last().get("message", "Done."))
+                elif isinstance(plan, dict):  # system action from the assistant (end process / power)
+                    sysm = self.svc.system
+                    ok, msg = (sysm.terminate(plan["pid"], bool(plan.get("force"))) if plan["op"] == "terminate"
+                               else sysm.power(plan["action"]))
+                    self.speak(msg)
                 else:
                     self._run(plan)
                 return
@@ -403,7 +412,9 @@ class VoiceListener:
         if plan is None:  # assistant intent (status, time, volume, …)
             self._say_log("you", text)
             if reply.kind == "confirm":
-                self.speak(reply.say.split(" Press Confirm")[0] + " For safety, please confirm this on screen.")
+                self.pending = (reply.data, time.monotonic() + 30)
+                self.state = "waiting_yes"
+                self.speak(reply.say.split(" Press Confirm")[0] + " Say yes to do it, or no.")
             elif reply.kind == "stop":
                 self._emergency_stop()
             elif reply.kind == "navigate":
@@ -424,10 +435,13 @@ class VoiceListener:
             self.speak(plan.violations[0] if plan.violations else "I can't do that.")
         elif plan.risk == Risk.LOW and not plan.requires_approval:
             self._run(plan, announce=True)
-        elif plan.risk == Risk.MEDIUM and self.svc.settings.voice_confirm_by_voice:
+        elif plan.risk == Risk.MEDIUM and self.svc.settings.voice_instant:
+            self._run(plan, announce=True)  # instant mode: your spoken command is the approval
+        elif self.svc.settings.voice_confirm_by_voice:
             self.pending = (plan, time.monotonic() + 30)
             what = plan.steps[0].description if len(plan.steps) == 1 else plan.summary
-            self.speak(f"{what}. Should I do it? Say yes or no.")
+            risk = "high-risk" if plan.risk == Risk.HIGH else "a change"
+            self.speak(f"{what}. This is {risk}. Say yes to do it, or no.")
             self.state = "waiting_yes"
         else:
             self.speak(f"That is a {plan.risk.value}-risk task: {plan.summary}. Please approve it on screen in the "
@@ -440,6 +454,10 @@ class VoiceListener:
         state = self.svc.orchestrator.submit(plan, approved=True, background=True)
         self.current_run = state
         while not state.done and not self._stop.is_set():
+            if state.status == "paused" and state.pause:
+                # Your spoken command (or "yes" for high risk) is the confirmation; name clashes keep both files.
+                kind = state.pause["kind"]
+                self.svc.orchestrator.resume(state, "confirm" if kind == "confirm" else "rename", background=True)
             time.sleep(0.2)
         failed = [s for s in state.steps if s.status.value == "failed"]
         if failed:

@@ -23,7 +23,9 @@ def effective_lang(s) -> str:
 def ensure() -> None:
     """Start the always-on listener when enabled (local PC only). Idempotent — safe on every rerun."""
     s = state.svc()
-    if s.hosted or not s.settings.voice_handsfree:
+    if s.hosted or not s.settings.voice_handsfree or s.settings.voice_engine != "offline":
+        if LISTENER.running and (s.hosted or s.settings.voice_engine != "offline" or not s.settings.voice_handsfree):
+            LISTENER.stop()
         return
     lang = effective_lang(s)
     if LISTENER.running and (LISTENER.lang == lang or lang != s.settings.voice_lang):
@@ -53,7 +55,17 @@ def set_handsfree(on: bool, lang: str | None = None) -> tuple[bool, str]:
         LISTENER.stop()
         return True, "Hands-free voice turned off."
     LISTENER.stop()
+    if s.hosted or new.voice_engine == "browser":
+        return True, "Hands-free voice on — the page is listening (allow the microphone if your browser asks)."
     return LISTENER.start(s, effective_lang(s))
+
+
+def _save(**fields) -> None:
+    s = state.svc()
+    new = s.settings.model_copy(deep=True)
+    for k, v in fields.items():
+        setattr(new, k, v)
+    s.apply_settings(new, save=not s.hosted)
 
 
 def _meter(level: float) -> str:
@@ -64,7 +76,7 @@ def _meter(level: float) -> str:
 @st.fragment(run_every=1.0)
 def sidebar_indicator() -> None:
     s = state.svc()
-    if s.hosted:
+    if s.hosted or s.settings.voice_engine != "offline":
         return
     if nav := LISTENER.nav_request:
         LISTENER.nav_request = None
@@ -85,28 +97,64 @@ def sidebar_indicator() -> None:
 
 @st.fragment(run_every=1.0)
 def live_panel() -> None:
-    rows = list(LISTENER.log)[-14:]
+    s = state.svc()
+    src = LISTENER if (not s.hosted and s.settings.voice_engine == "offline") else st.session_state.get("_web_voice")
+    rows = list(src.log)[-14:] if src is not None else []
     body = "".join(
         f"<div class='l'><span class='t'>{m['t']}</span> <span class='{'p' if m['who'] == 'you' else 'OK' if m['who'] == 'agent' else 'WARN'}'>"
         f"{C.esc({'you': 'You', 'agent': 'Agent', 'ignored': 'Ignored', 'system': 'System'}.get(m['who'], m['who']))}:</span> "
         f"<span dir='auto'>{C.esc(m['text'])}</span></div>" for m in rows)
-    live = LISTENER.partial
+    offline = src is LISTENER
+    live = LISTENER.partial if offline else ""
     if live:
         body += f"<div class='l'><span class='p'>…</span> <i>{C.esc(live)}</i></div>"
-    status = STATE_TEXT.get(LISTENER.state, LISTENER.state) if LISTENER.running else "Voice off"
-    st.markdown(C.panel("Hands-free voice", "brain",
-                        f"<div class='v-meter big'>{_meter(LISTENER.level)}</div><div class='term'>{body or '…'}</div>",
+    if offline:
+        status = STATE_TEXT.get(LISTENER.state, LISTENER.state) if LISTENER.running else "Voice off"
+    else:
+        status = "Browser listening (see sidebar)" if s.settings.voice_handsfree else "Voice off"
+    meter = f"<div class='v-meter big'>{_meter(LISTENER.level)}</div>" if offline else ""
+    st.markdown(C.panel("Hands-free voice", "brain", f"{meter}<div class='term'>{body or 'Say a command…'}</div>",
                         meta=status), unsafe_allow_html=True)
 
 
 def page_section() -> None:
     """Hands-free controls at the top of the Voice Assistant page."""
     s = state.svc()
+    st.markdown(C.callout("info", "<b>Just talk.</b> The agent listens all the time and acts on what you say — no "
+                                  "buttons. Normal and medium-risk commands run instantly; high-risk ones (deleting, "
+                                  "shutdown) only need you to say “yes”. Say “stop” any time."
+                                  + (" On this website, apps open as web windows and sites open in new tabs; run it "
+                                     "on your PC (run.bat) to control your real desktop." if s.hosted else "")),
+                unsafe_allow_html=True)
     if s.hosted:
-        st.markdown(C.callout("info", "<b>Hands-free (always-on) voice runs on your own PC.</b> A website cannot keep "
-                                      "your microphone open, so here use the record button below. Start the agent "
-                                      "locally with run.bat to just speak commands with no clicks."),
-                    unsafe_allow_html=True)
+        c1, c2 = st.columns([2, 3], vertical_alignment="center")
+        on = c1.toggle("Always-on voice", value=s.settings.voice_handsfree, key="vh_web")
+        if on != s.settings.voice_handsfree:
+            _save(voice_handsfree=on)
+            st.rerun()
+        c2.caption("Uses your browser's speech recognition (Chrome/Edge — the browser may process audio online). "
+                   "Allow the microphone once when asked.")
+        live_panel()
+        return
+    e1, e2, e3 = st.columns([1.4, 1.2, 1.2], vertical_alignment="center")
+    eng = e1.selectbox("Voice engine", ["browser", "offline"], index=["browser", "offline"].index(s.settings.voice_engine),
+                       format_func={"browser": "Browser speech — most accurate (Chrome/Edge)",
+                                    "offline": "Offline PC microphone (Vosk, private)"}.get)
+    inst = e2.toggle("Instant mode", value=s.settings.voice_instant,
+                     help="Run normal and medium-risk voice commands immediately without asking.")
+    spk = e3.toggle("Speak replies", value=s.settings.voice_speak)
+    if (eng, inst, spk) != (s.settings.voice_engine, s.settings.voice_instant, s.settings.voice_speak):
+        _save(voice_engine=eng, voice_instant=inst, voice_speak=spk)
+        st.session_state.pop("_voice_start_failed", None)
+        st.rerun()
+    if eng == "browser":
+        c1, c2 = st.columns([2, 3], vertical_alignment="center")
+        on = c1.toggle("Always-on voice (hands-free)", value=s.settings.voice_handsfree, key="vh_browser")
+        if on != s.settings.voice_handsfree:
+            _save(voice_handsfree=on)
+            st.rerun()
+        c2.caption("Keep this app's tab open in Chrome or Edge. Allow the microphone once when asked.")
+        live_panel()
         return
     ok, why = listener.available()
     lang = s.settings.voice_lang

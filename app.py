@@ -9,7 +9,7 @@ import streamlit as st
 
 from app import __version__
 from app.ui import (automation_page, explorer_page, history_page, main_window, manual_page, settings_dialog, state,
-                    system_page, voice_hud, voice_page)
+                    system_page, voice_hud, voice_page, web_voice)
 from app.ui.components import icon
 from app.ui.theme import CSS, FX_CSS, PALETTES, STATIC_CSS, fx_script
 
@@ -64,6 +64,7 @@ nav = st.navigation({"Agent": [pages["command"], pages["files"], pages["apps"]],
                      "System": [pages["system"], pages["voice"]],
                      "Records & setup": [pages["history"], pages["settings"], pages["manual"]]})
 voice_hud.ensure()
+web_voice.mount()
 sidebar()
 nav.run()
 voice_page.play_pending()

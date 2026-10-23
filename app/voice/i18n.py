@@ -376,6 +376,12 @@ T: dict[str, dict[str, str]] = {
 }
 
 
+BCP47 = {"en": "en-US", "en-hq": "en-US", "en-in": "en-IN", "ur": "ur-PK", "hi": "hi-IN", "ar": "ar-SA", "fa": "fa-IR",
+         "tr": "tr-TR", "fr": "fr-FR", "es": "es-ES", "de": "de-DE", "it": "it-IT", "pt": "pt-BR", "ru": "ru-RU",
+         "zh": "zh-CN", "ja": "ja-JP", "ko": "ko-KR", "nl": "nl-NL", "uk": "uk-UA", "vi": "vi-VN", "gu": "gu-IN",
+         "te": "te-IN"}
+
+
 def lang_info(code: str) -> dict:
     return LANGS.get(code, LANGS["en"])
 

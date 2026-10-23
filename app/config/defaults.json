@@ -49,5 +49,7 @@
   "voice_handsfree": true,
   "voice_lang": "en",
   "voice_speak": true,
-  "voice_confirm_by_voice": true
+  "voice_confirm_by_voice": true,
+  "voice_instant": true,
+  "voice_engine": "browser"
 }
