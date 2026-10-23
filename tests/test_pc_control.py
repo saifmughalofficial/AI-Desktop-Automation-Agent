@@ -112,3 +112,23 @@ def test_find_program_matching():
 def test_voice_close_goes_to_agent_not_kill():
     r = VoiceAssistant(SystemManager(hosted=True)).handle("close notepad")
     assert r.kind == "agent"
+
+
+def test_default_browser_is_chrome_new_tab(monkeypatch):
+    calls = []
+    monkeypatch.setattr(pc_control, "browser_exe", lambda b: f"C:/{b}.exe" if b in {"chrome", "firefox"} else None)
+    monkeypatch.setattr(pc_control.subprocess, "Popen", lambda args, **kw: calls.append(args))
+    monkeypatch.setattr(pc_control.webbrowser, "open_new_tab", lambda url: calls.append(["system", url]) or True)
+    ok, msg = pc_control.open_url("https://x.com", "default", "chrome")
+    assert ok and calls[-1] == ["C:/chrome.exe", "https://x.com"] and "new Chrome tab" in msg
+    pc_control.open_url("https://x.com", "firefox", "chrome")
+    assert calls[-1] == ["C:/firefox.exe", "-new-tab", "https://x.com"]
+    ok, msg = pc_control.open_url("https://x.com", "default", "edge")  # preferred browser missing -> system default tab
+    assert ok and calls[-1] == ["system", "https://x.com"] and "not installed" in msg
+    ok, _ = pc_control.open_url("https://x.com", "edge", "chrome")  # explicitly named but missing -> honest failure
+    assert not ok
+
+
+def test_web_browser_setting_default(svc):
+    assert svc.settings.web_browser == "chrome"
+    assert "new tab" in svc.planner.plan("open youtube.com").steps[0].description

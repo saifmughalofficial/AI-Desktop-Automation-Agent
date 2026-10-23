@@ -83,6 +83,7 @@ class Settings(BaseModel):
     animations: bool = True
     theme: Literal["dual", "blue"] = "dual"
     background_fx: bool = True
+    web_browser: Literal["chrome", "edge", "firefox", "default"] = "chrome"  # used when a command names no browser
 
     def root_aliases(self) -> list[str]:
         return [r.alias for r in self.approved_roots]

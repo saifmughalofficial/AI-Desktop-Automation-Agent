@@ -99,8 +99,9 @@ def describe(action) -> dict:
                     verification="Read the editor control back and confirm the text is present.",
                     consequence="Adds text to the window's unsaved document (nothing is saved to disk).")
     if n == "open_url":
-        return dict(description=f"Open {action.url}" + ("" if action.browser == "default" else f" in {action.browser.title()}"),
-                    expected="The page opens in a browser tab.",
+        return dict(description=f"Open {action.url} in a new tab" + ("" if action.browser == "default"
+                                                                     else f" ({action.browser.title()})"),
+                    expected="The page opens in a new browser tab (Chrome unless you named another browser).",
                     verification="The browser accepts the request (page loading is not verified).",
                     consequence="Opens a web page; nothing is downloaded, submitted or sent.")
     if n == "compose_message":

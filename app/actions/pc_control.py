@@ -92,18 +92,26 @@ def browser_exe(name: str) -> str | None:
     return None
 
 
-def open_url(url: str, browser: str = "default") -> tuple[bool, str]:
-    if browser != "default":
-        exe = browser_exe(browser)
-        if not exe:
-            return False, f"{browser.title()} is not installed on this PC."
-        try:
-            subprocess.Popen([exe, url], shell=False, close_fds=True)
-        except OSError as exc:
-            return False, f"Could not start {browser.title()}: {exc}"
-        return True, f"Opened {url} in {browser.title()}."
-    ok = webbrowser.open(url, new=2)
-    return ok, f"Opened {url} in your default browser." if ok else "No web browser could be opened."
+def open_url(url: str, browser: str = "default", preferred: str = "chrome") -> tuple[bool, str]:
+    """Open ``url`` as a NEW TAB. ``browser`` is what the command named; ``preferred`` (Settings) is used when it
+    named none. Falls back to the Windows default browser if the chosen one is not installed."""
+    named = browser != "default"
+    choice = browser if named else preferred
+    if choice != "default":
+        exe = browser_exe(choice)
+        if exe:
+            args = [exe, "-new-tab", url] if choice == "firefox" else [exe, url]  # Chrome/Edge reuse the open window
+            try:
+                subprocess.Popen(args, shell=False, close_fds=True)
+                return True, f"Opened {url} in a new {choice.title()} tab."
+            except OSError as exc:
+                if named:
+                    return False, f"Could not start {choice.title()}: {exc}"
+        elif named:
+            return False, f"{choice.title()} is not installed on this PC."
+    ok = webbrowser.open_new_tab(url)
+    note = "" if choice == "default" else f" ({choice.title()} is not installed)"
+    return ok, (f"Opened {url} in a new tab of your default browser{note}." if ok else "No web browser could be opened.")
 
 
 # ---------------------------------------------------------------- installed programs (Start menu)

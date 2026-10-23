@@ -2,6 +2,8 @@
 Character Map, file viewer and folder viewer."""
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 import streamlit as st
 
@@ -117,6 +119,13 @@ def render_virtual_desktop() -> None:
                         st.caption("Review the draft, then press Send yourself — the agent never sends.")
                     st.link_button("Open " + ("draft" if d else win["url"][:60]), win["url"], type="primary",
                                    icon=":material/open_in_new:", width="stretch")
+                    opened = st.session_state.setdefault("vd_auto_opened", set())
+                    if win["id"] not in opened:
+                        opened.add(win["id"])
+                        target = json.dumps(win["url"]).replace("<", "\\u003c")
+                        st.html(f"<script>try{{window.open({target},'_blank','noopener');}}catch(e){{}}</script>",
+                                unsafe_allow_javascript=True)
+                        st.caption("Opened in a new browser tab. If a pop-up blocker stopped it, press Open.")
                 elif kind == "image":
                     st.image(win["path"], width="stretch")
                 elif kind == "explorer":

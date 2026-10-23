@@ -336,8 +336,9 @@ def _open_url(a: A.OpenUrl, ctx: ExecContext) -> ActionResult:
         return _sim(f"Would open {a.url}" + ("" if a.browser == "default" else f" in {a.browser.title()}") + ".")
     if ctx.virtual is not None:
         win = ctx.virtual.open_link(a.url, a.url)
-        return _ok(f"Ready in the web virtual desktop: click the link in “{win['title']}” to open {a.url}.")
-    ok, msg = pc_control.open_url(a.url, a.browser)
+        return _ok(f"Opening {a.url} in a new browser tab (if your browser blocks it, use the Open button in "
+                   f"“{win['title']}”).")
+    ok, msg = pc_control.open_url(a.url, a.browser, ctx.settings.web_browser)
     return _ok(msg, verified=False) if ok else _fail(msg)
 
 
@@ -349,7 +350,8 @@ def _compose_message(a: A.ComposeMessage, ctx: ExecContext) -> ActionResult:
     if ctx.virtual is not None:
         win = ctx.virtual.open_link(f"Draft — {label}", url, draft={"to": a.to, "subject": a.subject, "body": a.body})
         return _ok(f"Draft ready in “{win['title']}”: open it, review, and press Send yourself (the agent never sends).")
-    ok, msg = pc_control.open_url(url) if a.channel != "email" else (app_launcher.open_mailto(url))
+    ok, msg = (pc_control.open_url(url, "default", ctx.settings.web_browser) if a.channel != "email"
+               else app_launcher.open_mailto(url))
     return (_ok(f"Opened a pre-filled {label} draft — review it and press Send yourself. Nothing was sent.",
                 verified=False) if ok else _fail(msg))
 

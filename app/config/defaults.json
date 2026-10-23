@@ -44,5 +44,6 @@
   "history_enabled": true,
   "animations": true,
   "theme": "dual",
-  "background_fx": true
+  "background_fx": true,
+  "web_browser": "chrome"
 }

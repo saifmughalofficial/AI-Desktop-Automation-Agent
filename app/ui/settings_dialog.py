@@ -169,10 +169,17 @@ def render() -> None:
             theme = st.segmented_control("Color theme", ["dual", "blue"], default=s.settings.theme,
                                          format_func={"dual": "Dual Neon (blue × red)", "blue": "Cyber Blue"}.get)
             theme = theme or s.settings.theme
-            if (hist, anim, fx, theme) != (s.settings.history_enabled, s.settings.animations, s.settings.background_fx,
-                                           s.settings.theme):
+            opts = ["chrome", "edge", "firefox", "default"]
+            web = st.selectbox("Browser for websites (when you don't name one)", opts,
+                               index=opts.index(s.settings.web_browser),
+                               format_func={"chrome": "Google Chrome (new tab)", "edge": "Microsoft Edge (new tab)",
+                                            "firefox": "Mozilla Firefox (new tab)",
+                                            "default": "Windows default browser"}.get)
+            if (hist, anim, fx, theme, web) != (s.settings.history_enabled, s.settings.animations,
+                                                s.settings.background_fx, s.settings.theme, s.settings.web_browser):
                 new = s.settings.model_copy(deep=True)
                 new.history_enabled, new.animations, new.background_fx, new.theme = hist, anim, fx, theme
+                new.web_browser = web
                 _save(new, "Workspace preferences saved.")
             st.caption(f"Data folder (settings, history, logs): `{s.data_dir}`")
             st.caption(f"Demo workspace: `{s.workspace}`")
